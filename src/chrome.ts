@@ -64,13 +64,42 @@ export async function context(): Promise<BrowserContext> {
  * can close the tabs of one that died without closing them (killed servers used to leave tabs).
  */
 export async function ownPage(ctx?: BrowserContext): Promise<Page> {
-  const page = await (ctx ?? (await context())).newPage();
+  const page = await newTab(ctx ?? (await context()));
   const mark = `window.name = "bmcp-${process.pid}"`;
   await page.addInitScript(mark);
   await page.evaluate(mark).catch(() => undefined);
   // Opening a tab restores a minimized window, so minimize it again.
   if (windowMode() === "minimized") await setWindow(page, { windowState: "minimized" }).catch(() => undefined);
   return page;
+}
+
+/**
+ * Open a tab without activating it. Playwright's newPage() makes the new tab active, which on macOS
+ * brings Chrome in front of the app you're using, and on Windows restores the minimized window.
+ */
+async function newTab(ctx: BrowserContext): Promise<Page> {
+  const b = ctx.browser();
+  if (!b) return ctx.newPage();
+  const cdp = await b.newBrowserCDPSession();
+  try {
+    const { targetId } = (await cdp.send("Target.createTarget", { url: "about:blank", background: true })) as { targetId: string };
+    // Other processes may open tabs in the same Chrome, so match this one by its target id.
+    const deadline = Date.now() + 10_000;
+    while (Date.now() < deadline) {
+      for (const p of ctx.pages()) {
+        const s = await ctx.newCDPSession(p).catch(() => null);
+        if (!s) continue;
+        const info = (await s.send("Target.getTargetInfo").catch(() => null)) as { targetInfo?: { targetId: string } } | null;
+        await s.detach().catch(() => undefined);
+        if (info?.targetInfo?.targetId === targetId) return p;
+      }
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    await cdp.send("Target.closeTarget", { targetId }).catch(() => undefined);
+    throw new Error("Chrome opened a tab but it never appeared");
+  } finally {
+    await cdp.detach().catch(() => undefined);
+  }
 }
 
 const alive = (pid: number) => { try { process.kill(pid, 0); return true; } catch (e) { return (e as NodeJS.ErrnoException).code === "EPERM"; } };
@@ -85,7 +114,7 @@ async function closeOrphanTabs(ctx: BrowserContext) {
     if (pid ? !alive(Number(pid)) : name === "" && /^https:\/\/(www|auth)\.band\.us\//.test(p.url())) doomed.push(p);
   }
   // Keep one tab, or Chrome closes the window and quits.
-  if (doomed.length && doomed.length === pages.length) await ctx.newPage();
+  if (doomed.length && doomed.length === pages.length) await newTab(ctx);
   for (const p of doomed) await p.close().catch(() => undefined);
 }
 
@@ -118,7 +147,7 @@ async function setWindow(page: Page, bounds: Bounds) {
 
 /** Put the server's Chrome window in the configured state: minimized, or left as an ordinary window. */
 async function applyWindowMode(ctx: BrowserContext) {
-  const page = ctx.pages()[0] ?? (await ctx.newPage());
+  const page = ctx.pages()[0] ?? (await newTab(ctx));
   await setWindow(page, { windowState: windowMode() === "minimized" ? "minimized" : "normal" });
 }
 
