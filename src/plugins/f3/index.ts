@@ -1,5 +1,5 @@
-// F3 workouts: Q, PAX count, attendees and AO from backblasts wherever they were posted
-// (event comments, feed posts, post comments). Turn on with { "plugins": ["f3"] }.
+// This plugin extracts F3 Q, PAX count, attendees, and AO from backblasts in event comments,
+// feed posts, and post comments. Enable it in settings.json with { "plugins": ["f3"] }.
 import * as store from "../../store";
 import { type Tool, bands, date, resolveBands, defaultBands, bandName, day, dayEnd, coverageNote } from "../../helpers";
 import type { Plugin } from "..";

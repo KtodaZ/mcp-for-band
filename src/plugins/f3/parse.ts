@@ -1,8 +1,7 @@
-// First-pass parsing of workout event comments into *suggestions*. Nothing here is a fact.
-// Attendance stays parsed for data compatibility but is not part of the editor; milestone
-// suggestions are the only source details volunteers confirm in the review UI.
-// A sampled backblast uses "Total Pax:3" followed by one attendee per line, sometimes
-// wrapped in BAND's <band:refer> markup. These remain suggestions; keep the source text.
+// This module parses workout event comments into unverified suggestions. It parses attendance
+// for data compatibility outside the editor, and volunteers confirm only milestone suggestions
+// in the review UI. A sampled backblast uses "Total Pax:3" followed by one attendee per line,
+// sometimes wrapped in BAND's <band:refer> markup. Keep the source text alongside suggestions.
 
 export type { SourceComment } from "./types";
 import type { AttendanceCandidate, MilestoneKind, MilestoneSuggestion, SourceComment } from "./types";

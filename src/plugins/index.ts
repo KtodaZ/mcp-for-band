@@ -1,5 +1,5 @@
-// Optional tool sets. Each plugin is a folder here whose index.ts exports a Plugin; add it to
-// PLUGINS below. Users turn plugins on by name in settings.json: { "plugins": ["f3"] }.
+// This module loads optional plugins. Each plugin is a folder whose index.ts exports a Plugin,
+// listed in PLUGINS below. Enable plugins in settings.json, such as { "plugins": ["f3"] }.
 // See docs/plugins.md.
 import type { Tool } from "../helpers";
 import { loadSettings } from "../config";

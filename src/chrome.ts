@@ -1,7 +1,7 @@
-// The MCP's own Chrome: a normal (not automation-flagged) Chrome with a dedicated profile and a
-// DevTools port on 127.0.0.1. Any MCP process can start it or attach to it, so several Claude
-// sessions share one signed-in BAND session. Credentials and codes are only ever typed by
-// scripts that read them from files the user supplied; nothing here prints them.
+// This module manages a standard Chrome instance without automation flags, using a dedicated
+// profile and a DevTools port on 127.0.0.1. Any server process can start or attach to it so
+// multiple Claude sessions share one signed-in BAND session. Scripts type credentials and codes
+// only from user-supplied files, and this module never prints them.
 import { spawn } from "node:child_process";
 import fs from "node:fs";
 import { chromium, type Browser, type BrowserContext, type Page } from "playwright-core";

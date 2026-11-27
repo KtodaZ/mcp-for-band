@@ -1,5 +1,5 @@
-// Shared by the core tools and by plugins (src/plugins/*): tool types, band lookup, dates in the
-// configured time zone, and the coverage note every cache read returns.
+// Core tools and plugins under src/plugins share this module. It defines tool types, band
+// lookup, dates in the configured time zone, and the coverage note that each cache read returns.
 import * as store from "./store";
 import { BandError } from "./band";
 import { loadSettings, TIME_ZONE } from "./config";

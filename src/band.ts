@@ -1,12 +1,11 @@
-// BAND web API access through the signed-in tab.
+// This module accesses the BAND web API through the signed-in Chrome tab.
 //
-// BAND's web client signs every api*.band.us request (md/akey headers) with its own JavaScript.
-// Two ways to get data, both through BAND's own code, never by forging a signature:
-//   1. capture(): load a BAND page and collect the JSON responses the page itself requests.
-//      Always works, a few seconds per page. Every captured URL is recorded (path and parameter
-//      names only) so the endpoint catalogue documents itself.
-//   2. call(): send a request through BAND's own API client in the page, so BAND signs it.
-//      One round trip (a few hundred ms). Used for all reads and writes once the endpoint is known.
+// BAND's web client signs every api*.band.us request with md and akey headers using its own
+// JavaScript. This module fetches data through BAND's client code without forging signatures:
+//   1. capture() loads a BAND page and collects the JSON responses that the page requests. It
+//      takes a few seconds per page and records each captured URL's path and parameter names.
+//   2. call() sends a request through BAND's API client in the page so BAND signs it. Each call
+//      takes a few hundred milliseconds and handles all reads and writes for known endpoints.
 import fs from "node:fs";
 import path from "node:path";
 import type { Page } from "playwright-core";

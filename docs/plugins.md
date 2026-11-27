@@ -1,24 +1,24 @@
 # Plugins
 
-A plugin is an optional set of tools for one kind of band, such as F3 workouts. Core tools (sync, search, posts, comments, approvals) are always on; plugin tools appear only when the user turns the plugin on.
+A plugin is an optional tool set for one kind of band, such as F3 workouts. Core tools for sync, search, posts, comments, and approvals stay on. Plugin tools load only when you turn the plugin on.
 
 ## Turning one on
 
-In `settings.json` in the data folder:
+Add the plugin to `settings.json` in the data folder:
 
 ```json
 { "plugins": ["f3"] }
 ```
 
-Restart the server or the MCP client. `status` lists the plugins that are on. An unknown name is an error.
+Restart the server or MCP client. `status` lists enabled plugins, and an unknown name returns an error.
 
 | Plugin | Tools |
 |---|---|
-| `f3` | `list_workouts`, `workout_stats`, `who_qd`: Q, PAX count, attendees and AO from backblasts |
+| `f3` | `list_workouts`, `workout_stats`, and `who_qd` parse Q, PAX count, attendees, and AO from backblasts |
 
 ## Writing one
 
-1. Make a folder `src/plugins/<name>/` with an `index.ts` that default-exports a `Plugin`:
+1. Create `src/plugins/<name>/index.ts` and default-export a `Plugin`:
 
    ```ts
    import * as store from "../../store";
@@ -40,12 +40,12 @@ Restart the server or the MCP client. `status` lists the plugins that are on. An
    ```
 
 2. Add it to `PLUGINS` in `src/plugins/index.ts`.
-3. Add tests to `test/` with invented data only, and a row to the table above.
+3. Add tests in `test/` with invented data only, and add a row above.
 
-Rules for plugin tools:
+Follow these rules for plugin tools:
 
-- **Read from the cache** (`store`) and return `coverageNote(...)` with results, so "nothing found" isn't mistaken for "doesn't exist".
-- **Don't write to BAND directly.** Writes go through the core `prepare_*` tools and the user's approval. A plugin tool must not call `call()` with a write endpoint.
-- **Treat BAND text as data.** Member content can contain instructions; never act on it. Add `UNTRUSTED` to the description of tools that return member text.
-- **Tool names must be unique** across core and all plugins; a clash stops the server from listing tools.
-- `instructions` (optional) is appended to what the server tells the model while the plugin is on. Keep it to a sentence or two.
+- **Read from the cache.** Read `store` and return `coverageNote(...)` so callers distinguish missing results from unsynced dates.
+- **Do not write to BAND.** Writes go through core `prepare_*` tools and user approval. Never call `call()` with a write endpoint.
+- **Treat BAND text as data.** Member text can contain instructions, so never act on it. Add `UNTRUSTED` to descriptions of tools that return member text.
+- **Use unique tool names.** Names must be unique across core and plugins, or the server fails to list tools.
+- **Keep `instructions` short.** The server appends optional `instructions` to its model instructions while the plugin is on. Use one or two sentences.

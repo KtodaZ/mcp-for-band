@@ -1,5 +1,5 @@
-// Workouts are built from wherever they were reported: a BAND event and its comments, a feed post,
-// a post comment, or a reply. Every field carries its source; unknown stays unknown.
+// This module builds workouts from BAND events and their comments, feed posts, post comments,
+// and replies. Every parsed field records its source, and missing values remain null.
 import { extractAttendance, siteFromReport, milestoneSuggestions, type SourceComment } from "./parse";
 import { stripMarkup } from "../../store";
 import { localDate } from "../../helpers";

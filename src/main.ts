@@ -1,9 +1,9 @@
-// band-mcp CLI
-//   serve            HTTP MCP + approval page on 127.0.0.1 (plus Tailscale with BAND_MCP_TAILSCALE=1); background sync for chosen bands
-//   stdio            MCP over stdio (Claude Code on this computer)
-//   set-pin <file>   set the approval-page PIN from a file (the file is read, never printed)
-//   signin           show the MCP's Chrome on band.us so you can sign in by hand, then hide it
-//   status           signed in? cached bands? coverage?
+// This module runs the band-mcp CLI commands:
+//   serve            Starts the HTTP server and approval page on 127.0.0.1, or Tailscale with BAND_MCP_TAILSCALE=1, and syncs configured bands.
+//   stdio            Starts the server over stdio for Claude Code on this computer.
+//   set-pin <file>   Reads the approval-page PIN from a file without printing it.
+//   signin           Shows the server's Chrome on band.us so you can sign in, then hides it.
+//   status           Reports sign-in state, cached bands, and cache coverage.
 import fs from "node:fs";
 import { serveHttp, serveStdio } from "./server";
 import { loadSecrets, saveSecrets, loadSettings, ensureDataDir } from "./config";

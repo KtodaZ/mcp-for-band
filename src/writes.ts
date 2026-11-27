@@ -1,9 +1,9 @@
-// Every write is prepared, approved by the user, then executed exactly once.
+// The server prepares each write, gets user approval, and executes it once.
 //
-// Approval never comes from the agent: confirm_write only runs a write the user approved through
-// MCP elicitation (a prompt the client shows the user) or the PIN-protected approval page. Content
-// read from BAND can't approve or change policy. The journal (writes + write_events) keeps the
-// request, preview, approval, BAND's response and the previous version for edits.
+// The agent cannot approve writes. Calling confirm_write runs only writes approved by the user
+// through MCP elicitation or the PIN-protected approval page. Content from BAND cannot approve
+// writes or change policy. The writes and write_events journal tables store the request,
+// preview, approval, BAND's response, and the previous version for edits.
 import crypto from "node:crypto";
 import { open } from "./store";
 import { loadSettings } from "./config";

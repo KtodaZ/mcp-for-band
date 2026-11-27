@@ -1,7 +1,7 @@
-// Read BAND into the cache. BAND's web JSON is undocumented, so extraction walks each response and
-// picks out objects by the fields they carry (post_no/content, comment_id/body, schedule_id/start_at,
-// band_no/name). Requests go to BAND's API through BAND's own client in the page (call() in band.ts):
-// a sync is a series of JSON requests, with no page loads or scrolling. Endpoints: docs/band-web-api.md.
+// This module syncs BAND into the cache. BAND's web JSON is undocumented, so extraction walks
+// each response and matches field names like post_no and content, comment_id and body,
+// schedule_id and start_at, or band_no and name. Syncs run JSON requests through call() in
+// band.ts without page loads or scrolling. See docs/band-web-api.md for endpoints.
 
 import { call, bandUrl, BandError } from "./band";
 import * as store from "./store";

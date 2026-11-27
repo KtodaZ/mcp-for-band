@@ -1,6 +1,6 @@
-// MCP over JSON-RPC: stdio (local Claude Code; supports elicitation, so the user approves writes
-// in their client) and HTTP (this machine, or your Tailscale network if enabled, bearer tokens; approvals through the
-// PIN-protected approval page).
+// This module serves MCP over JSON-RPC on stdio and HTTP. Stdio uses elicitation for local
+// Claude Code approvals. HTTP uses bearer tokens on this host or Tailscale and approves writes
+// on the PIN-protected page.
 import http from "node:http";
 import os from "node:os";
 import crypto from "node:crypto";

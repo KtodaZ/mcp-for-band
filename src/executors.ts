@@ -1,6 +1,6 @@
-// BAND requests behind each approved write. Each was verified on a private test band
-// on 2026-11-24; see docs/band-web-api.md. Only the server
-// registers these (registerExecutors in main.ts), so tests never reach BAND.
+// This module runs the BAND requests behind each approved write. Testing on a private test band
+// on 2026-11-24 verified these endpoints, which docs/band-web-api.md documents. Only main.ts
+// calls registerExecutors when starting the server, so tests never call BAND.
 import crypto from "node:crypto";
 import { call, bandUrl, BandError } from "./band";
 import { registerExecutor, type WritePayload } from "./writes";

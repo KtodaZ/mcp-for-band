@@ -1,8 +1,8 @@
-// Photo and video attachments for posts and comments (mapped on the test band 2026-11-26; see
-// docs/band-web-api.md). BAND signs its upload requests itself, so the upload goes through BAND's
-// own comment-box file input in a separate tab: DevTools hands Chrome the local file path
-// (DOM.setFileInputFiles, which has no size limit), and the tab's upload response is read back.
-// Nothing is posted from that tab; the write itself is a normal call() with the uploaded ids.
+// This module uploads photo and video attachments for posts and comments, mapped on the test
+// band on 2026-11-26 in docs/band-web-api.md. Because BAND signs uploads itself, the server uses
+// BAND's comment-box file input in a separate tab. DevTools passes Chrome the local file path
+// through DOM.setFileInputFiles without a size limit, and the server reads the upload response.
+// That tab posts nothing, and the write runs through call() with the uploaded ids.
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";

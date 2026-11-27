@@ -1,5 +1,5 @@
-// Local cache (SQLite, FTS5) of what the MCP has read from BAND, plus the write journal.
-// Lives in DATA_DIR, never in Git: it holds member content.
+// This module stores the write journal and a local SQLite FTS5 cache of data read from BAND.
+// The database lives in DATA_DIR outside Git because it holds member content.
 import { DatabaseSync } from "node:sqlite";
 import { DB_PATH, ensureDataDir } from "./config";
 
