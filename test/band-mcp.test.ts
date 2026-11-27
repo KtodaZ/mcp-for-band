@@ -7,6 +7,9 @@ import { beforeAll, describe, expect, it } from "vitest";
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "band-mcp-"));
 process.env.BAND_MCP_DIR = dir;
 process.env.BAND_MCP_TZ = "America/Los_Angeles";
+// Never reach a real Chrome (the default DevTools port is 9333).
+process.env.BAND_MCP_CDP_PORT = "9";
+process.env.BAND_MCP_CHROME = "/nonexistent/chrome";
 fs.writeFileSync(path.join(dir, "settings.json"), JSON.stringify({ plugins: ["f3"] }));
 
 const store = await import("../src/store");

@@ -46,24 +46,26 @@ export const describe = (a: Attachment) => `${path.basename(a.path)}${a.kind ===
  */
 export async function upload(pageUrl: string, items: Attachment[]): Promise<Uploaded[]> {
   if (!items.length) return [];
-  const ctx = await context();
-  const page = await ctx.newPage();
-  page.on("dialog", (d) => d.dismiss().catch(() => undefined));
-  // Upload a private copy checked against the approved hash, so the file can't change between the
-  // check and the upload.
+  // Copy every file privately and check each copy against its approved hash before opening Chrome,
+  // so a changed file stops the write before anything is uploaded, and can't change mid-upload.
   const stage = fs.mkdtempSync(path.join(DATA_DIR, "upload-"));
+  let page: Page | undefined;
   try {
-    const out: Uploaded[] = [];
+    const copies = [];
     for (const [i, a] of items.entries()) {
       const title = path.basename(a.path);
       const copy = path.join(stage, `${i}${path.extname(a.path)}`);
       try { fs.copyFileSync(a.path, copy); } catch { throw new BandError("unsupported", `Can't read ${title} any more; prepare the write again`); }
       if ((await sha256File(copy)) !== a.sha256) throw new BandError("unsupported", `${title} changed since it was approved; prepare the write again`);
-      out.push(await uploadOne(page, pageUrl, { ...a, path: copy }, title));
+      copies.push({ a: { ...a, path: copy }, title });
     }
+    page = await (await context()).newPage();
+    page.on("dialog", (d) => d.dismiss().catch(() => undefined));
+    const out: Uploaded[] = [];
+    for (const { a, title } of copies) out.push(await uploadOne(page, pageUrl, a, title));
     return out;
   } finally {
-    await page.close().catch(() => undefined);
+    await page?.close().catch(() => undefined);
     fs.rmSync(stage, { recursive: true, force: true });
   }
 }
