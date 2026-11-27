@@ -1,13 +1,11 @@
 // This module runs the band-mcp CLI commands:
-//   serve            Starts the HTTP server and approval page on 127.0.0.1, or Tailscale with BAND_MCP_TAILSCALE=1, and syncs configured bands.
+//   serve            Starts the HTTP server on 127.0.0.1, or Tailscale with BAND_MCP_TAILSCALE=1, and syncs configured bands.
 //   stdio            Starts the server over stdio for Claude Code on this computer.
-//   set-pin <file>   Reads the approval-page PIN from a file without printing it.
 //   signin           Shows the server's Chrome on band.us so you can sign in, then hides it.
 //   status           Reports sign-in state, cached bands, and cache coverage.
 import fs from "node:fs";
 import { serveHttp, serveStdio } from "./server";
 import { loadSecrets, saveSecrets, loadSettings, ensureDataDir } from "./config";
-import { hashPin } from "./writes";
 import { syncPosts, syncEvents } from "./sync";
 import { callTool } from "./tools";
 import { localDate } from "./helpers";
@@ -41,11 +39,6 @@ if (cmd === "serve") {
   }
 } else if (cmd === "stdio") {
   serveStdio();
-} else if (cmd === "set-pin") {
-  const pin = fs.readFileSync(arg!, "utf8").trim();
-  if (!/^\d{4,12}$/.test(pin)) { console.error("PIN must be 4–12 digits"); process.exit(1); }
-  saveSecrets({ ...loadSecrets(), pinHash: hashPin(pin) });
-  console.log("Approval PIN set.");
 } else if (cmd === "signin") {
   // You type your own credentials in BAND's page; nothing here reads or stores them.
   const page = await (await context()).newPage();
@@ -69,15 +62,15 @@ if (cmd === "serve") {
   await disconnect();
   process.exit(ok ? 0 : 1);
 } else if (cmd === "status") {
-  const out = await callTool("status", {}, { canWrite: false, approvalUrl: () => "" });
+  const out = await callTool("status", {}, { canWrite: false });
   console.log(JSON.stringify(out, null, 1));
   await disconnect();
 } else if (cmd === "tool") {
   // Dev: band-mcp tool <name> '<json args>'
-  const out = await callTool(arg!, JSON.parse(process.argv[4] ?? "{}"), { canWrite: false, approvalUrl: () => "" });
+  const out = await callTool(arg!, JSON.parse(process.argv[4] ?? "{}"), { canWrite: false });
   console.log(JSON.stringify(out, null, 1));
   await disconnect();
 } else {
-  console.error("usage: band-mcp serve|stdio|signin|set-pin <file>|status|tool <name> <json>");
+  console.error("usage: band-mcp serve|stdio|signin|status|tool <name> <json>");
   process.exit(1);
 }

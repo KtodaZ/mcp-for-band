@@ -7,7 +7,7 @@ mcp-for-band is an unofficial [MCP](https://modelcontextprotocol.io) server for 
 ## What it does
 
 - **Local cache reads.** The server syncs posts, comments, events, event comments, and members into SQLite and searches across bands with `sync`, `search`, `list_posts`, `get_item`, `get_notices`, `find_member`, and `get_media`.
-- **Approved writes.** Create posts, comments, replies, mentions, photos, videos, post edits, notices, and, when enabled, deletes. A `prepare_*` tool returns a preview, and the server sends nothing to BAND until you approve it in your client or on the PIN-protected approval page. The server binds each approval to the text, target, and each file's SHA-256.
+- **Approved writes.** Create posts, comments, replies, mentions, photos, videos, post edits, notices, and, when enabled, deletes. A `prepare_*` tool returns a preview, and the server sends nothing to BAND until you approve it, either in your client's prompt or by saying yes in chat. The server binds each approval to the text, target, and each file's SHA-256.
 - **Optional plugins.** Turn on band-specific tool sets in `settings.json`. The `f3` plugin adds `list_workouts`, `workout_stats`, and `who_qd` to parse Q, PAX count, and attendees from backblasts with heuristics and leaves unknown counts unknown. One folder adds a plugin; see [docs/plugins.md](docs/plugins.md).
 
 The server does not send chat messages, attach files on edits, or delete replies.
@@ -39,7 +39,7 @@ Over stdio, Claude Code asks you to approve each write. You can then ask "sync m
 
 ### Optional HTTP mode
 
-`band-mcp serve` runs HTTP on `127.0.0.1:47811` with bearer tokens in `secrets.json` in the data folder. Use `readToken` for reads or `writeToken` to allow writes. It also serves `/approve/<id>`, which needs a PIN. Put 4–12 digits in a file and run `band-mcp set-pin <file>`. Set `BAND_MCP_TAILSCALE=1` to listen on Tailscale addresses too. The server never listens on other networks.
+`band-mcp serve` runs HTTP on `127.0.0.1:47811` with bearer tokens in `secrets.json` in the data folder. Use `readToken` for reads or `writeToken` to allow writes. Set `BAND_MCP_TAILSCALE=1` to listen on Tailscale addresses too. The server never listens on other networks.
 
 ### Settings
 
@@ -61,7 +61,6 @@ Other environment variables set paths and defaults: `BAND_MCP_CHROME` sets Chrom
 - Text from BAND is member content. The server instructs the model to treat it as data, not instructions, and only you can approve writes.
 - Write previews expire after 10 minutes. The server refuses an edit if the post changed after the preview.
 - Keep the data folder private because it holds your BAND session. On macOS and Linux, the server creates it with mode 700.
-- The approval page locks out PINs for 15 minutes after 5 wrong tries, blocks framing, and accepts approvals only from its own origin.
 
 ## Development
 

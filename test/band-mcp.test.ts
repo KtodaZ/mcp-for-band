@@ -92,10 +92,10 @@ describe("cache and search", () => {
       { id: "post:222:7", kind: "post", bandNo: 222, author: "Yodel", body: "Backblast from the quarry\nQ: Gravel\nTotal pax 6", createdAt: "2026-11-19T14:00:00Z" },
     ]);
     store.setCoverage(222, "posts", "2026-11-01", "2026-11-24", true);
-    const res: any = await tools.callTool("search", { query: "backbl" }, { canWrite: false, approvalUrl: () => "" });
+    const res: any = await tools.callTool("search", { query: "backbl" }, { canWrite: false });
     expect(res.results.map((r: any) => r.band)).toEqual(["Pine Hollow Test"]);
     expect(res.covered.join(" ")).toContain("Pine Hollow Test: posts");
-    const ws: any = await tools.callTool("list_workouts", { bands: ["pine hollow test"], from: "2026-11-19" }, { canWrite: false, approvalUrl: () => "" });
+    const ws: any = await tools.callTool("list_workouts", { bands: ["pine hollow test"], from: "2026-11-19" }, { canWrite: false });
     expect(ws.workouts[0]).toMatchObject({ q: ["Gravel"], count: 6 });
   });
 
@@ -106,7 +106,7 @@ describe("cache and search", () => {
 });
 
 describe("writes", () => {
-  const ctx = { canWrite: true, approvalUrl: (id: string) => `http://x/approve/${id}` };
+  const ctx = { canWrite: true };
 
   it("never sends without the user's approval", async () => {
     const prep: any = await tools.callTool("prepare_post", { band: BAND, text: "Hello" }, ctx);
@@ -114,6 +114,15 @@ describe("writes", () => {
     const res: any = await tools.callTool("confirm_write", { write_id: prep.write_id }, ctx);
     expect(res.status).toBe("waiting_for_approval");
     expect(writes.get(prep.write_id)!.status).toBe("pending");
+  });
+
+  it("records a yes given in chat, and the client's answer wins when it can ask", async () => {
+    const prep: any = await tools.callTool("prepare_post", { band: BAND, text: "Chat yes" }, ctx);
+    await tools.callTool("confirm_write", { write_id: prep.write_id, user_approved: true }, ctx);
+    expect(writes.get(prep.write_id)!.approved_via).toBe("chat");
+    const prep2: any = await tools.callTool("prepare_post", { band: BAND, text: "Client no" }, ctx);
+    const res: any = await tools.callTool("confirm_write", { write_id: prep2.write_id, user_approved: true }, { ...ctx, elicit: async () => "decline" });
+    expect(res.status).toBe("rejected");
   });
 
   it("asks through elicitation and treats decline as rejected", async () => {
@@ -135,7 +144,7 @@ describe("writes", () => {
     writes.registerExecutor("comment", async () => { calls++; return { ok: true }; });
     store.upsertItems([{ id: `post:${BAND}:2`, kind: "post", bandNo: BAND, body: "post", createdAt: "2026-11-21T00:00:00Z" }]);
     const prep: any = await tools.callTool("prepare_comment", { id: `post:${BAND}:2`, text: "Nice" }, ctx);
-    writes.decide(prep.write_id, true, "page");
+    writes.decide(prep.write_id, true, "chat");
     const [r1, r2] = await Promise.allSettled([tools.callTool("confirm_write", { write_id: prep.write_id }, ctx), tools.callTool("confirm_write", { write_id: prep.write_id }, ctx)]);
     expect(calls).toBe(1);
     expect([r1, r2].some((r) => r.status === "fulfilled" && (r.value as any).status === "done")).toBe(true);
@@ -146,7 +155,7 @@ describe("writes", () => {
     store.upsertItems([{ id: `post:${BAND}:3`, kind: "post", bandNo: BAND, body: "v1", createdAt: "2026-11-21T00:00:00Z" }]);
     const prep: any = await tools.callTool("prepare_edit_post", { id: `post:${BAND}:3`, text: "v2" }, ctx);
     store.upsertItems([{ id: `post:${BAND}:3`, kind: "post", bandNo: BAND, body: "someone else edited", createdAt: "2026-11-21T00:00:00Z" }]);
-    writes.decide(prep.write_id, true, "page");
+    writes.decide(prep.write_id, true, "chat");
     const res: any = await tools.callTool("confirm_write", { write_id: prep.write_id }, ctx);
     expect(res.status).toBe("failed");
     expect(res.result.error).toContain("target changed");
@@ -220,9 +229,4 @@ describe("writes", () => {
     expect(h.localDate("2026-11-18T07:59:00Z")).toBe("2026-11-17");
   });
 
-  it("checks the approval PIN", () => {
-    const h = writes.hashPin("4321");
-    expect(writes.checkPin("4321", h)).toBe(true);
-    expect(writes.checkPin("1234", h)).toBe(false);
-  });
 });

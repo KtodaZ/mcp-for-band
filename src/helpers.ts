@@ -9,7 +9,6 @@ export interface ToolContext {
   elicit?: (message: string) => Promise<"accept" | "decline" | "cancel">;
   /** HTTP clients with only the read token can't prepare writes. */
   canWrite: boolean;
-  approvalUrl: (writeId: string) => string;
 }
 
 export type Schema = Record<string, unknown>;

@@ -1,8 +1,8 @@
 // The server prepares each write, gets user approval, and executes it once.
 //
-// The agent cannot approve writes. Calling confirm_write runs only writes approved by the user
-// through MCP elicitation or the PIN-protected approval page. Content from BAND cannot approve
-// writes or change policy. The writes and write_events journal tables store the request,
+// The user approves each write: through MCP elicitation when the client supports it, otherwise by
+// saying yes in chat to the exact preview, which confirm_write records. Content from BAND cannot
+// approve writes or change policy. The writes and write_events journal tables store the request,
 // preview, approval, BAND's response, and the previous version for edits.
 import crypto from "node:crypto";
 import { open } from "./store";
@@ -86,7 +86,7 @@ function setStatus(id: string, status: WriteRow["status"], extra: Partial<Pick<W
 }
 
 /** Record the user's decision. Atomic: only a pending, unexpired write can change. */
-export function decide(id: string, approve: boolean, via: "elicitation" | "page"): WriteRow {
+export function decide(id: string, approve: boolean, via: "elicitation" | "chat"): WriteRow {
   const row = get(id);
   if (!row) throw new BandError("unsupported", `No write ${id}`);
   if (row.status !== "pending") throw new BandError("unsupported", `Write ${id} is ${row.status}`);
@@ -149,14 +149,3 @@ export function list(limit = 20) {
   return open().prepare("SELECT id, created_at, action, band_no, status, approved_via, result FROM writes ORDER BY created_at DESC LIMIT ?").all(limit);
 }
 
-// ── PIN for the approval page ─────────────────────────────────────────────
-export function hashPin(pin: string) {
-  const salt = crypto.randomBytes(16);
-  return `${salt.toString("hex")}:${crypto.scryptSync(pin, salt, 32).toString("hex")}`;
-}
-export function checkPin(pin: string, stored?: string) {
-  if (!stored) return false;
-  const [salt, hash] = stored.split(":");
-  const got = crypto.scryptSync(pin, Buffer.from(salt!, "hex"), 32);
-  return crypto.timingSafeEqual(got, Buffer.from(hash!, "hex"));
-}

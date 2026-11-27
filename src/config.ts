@@ -71,10 +71,6 @@ export interface Secrets {
   readToken: string;
   /** Bearer token that also allows prepare_* write tools over HTTP. */
   writeToken: string;
-  /** scrypt hash of the approval PIN (set by the user; never printed). */
-  pinHash?: string;
-  /** Signs approval-page device cookies. */
-  cookieKey: string;
 }
 
 export function loadSecrets(): Secrets {
@@ -82,7 +78,7 @@ export function loadSecrets(): Secrets {
   try {
     return JSON.parse(fs.readFileSync(SECRETS_PATH, "utf8")) as Secrets;
   } catch {
-    const s: Secrets = { readToken: token(), writeToken: token(), cookieKey: token() };
+    const s: Secrets = { readToken: token(), writeToken: token() };
     saveSecrets(s);
     return s;
   }
