@@ -3,7 +3,7 @@
 // default; sign-in brings it to the front. Any server process can start or attach to it so
 // multiple Claude sessions share one signed-in BAND session. Scripts type credentials and codes
 // only from user-supplied files, and this module never prints them.
-import { spawn } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import fs from "node:fs";
 import { chromium, type Browser, type BrowserContext, type Page } from "playwright-core";
 import { CDP_PORT, CHROME_PATHS, PROFILE_DIR, ensureDataDir, loadSettings } from "./config";
@@ -19,11 +19,29 @@ async function cdpUp() {
   }
 }
 
-export async function ensureChrome(): Promise<void> {
-  if (await cdpUp()) return;
+// macOS brings a newly started Chrome to the front. These read and restore the app that was in
+// front before, by process id, through AppKit (no Accessibility or Automation permission needed).
+const jxa = (code: string) => new Promise<string>((resolve) => {
+  execFile("osascript", ["-l", "JavaScript", "-e", `ObjC.import("AppKit");${code}`], { timeout: 3000 }, (e, out) => resolve(e ? "" : String(out).trim()));
+});
+const frontPid = async () => Number(await jxa("$.NSWorkspace.sharedWorkspace.frontmostApplication.processIdentifier")) || null;
+const activatePid = (pid: number) => jxa(`$.NSRunningApplication.runningApplicationWithProcessIdentifier(${pid}).activateWithOptions(0)`);
+
+/** Put the app that was in front before Chrome started back in front. Chrome can take focus a moment after it's up, so check a few times. */
+async function restoreFront(pid: number) {
+  for (let i = 0; i < 4; i++) {
+    if ((await frontPid()) !== pid) await activatePid(pid);
+    await new Promise((r) => setTimeout(r, 500));
+  }
+}
+
+/** Start Chrome if it isn't running. Returns the pid of the app that was in front, on macOS, when it started Chrome. */
+export async function ensureChrome(): Promise<number | null> {
+  if (await cdpUp()) return null;
   ensureDataDir();
   const exe = CHROME_PATHS.find((p) => fs.existsSync(p));
   if (!exe) throw new Error("Chrome not found; set BAND_MCP_CHROME");
+  const front = process.platform === "darwin" ? await frontPid() : null;
   const child = spawn(exe, [
     `--user-data-dir=${PROFILE_DIR}`,
     `--remote-debugging-port=${CDP_PORT}`,
@@ -42,7 +60,7 @@ export async function ensureChrome(): Promise<void> {
   child.unref();
   for (let i = 0; i < 40; i++) {
     await new Promise((r) => setTimeout(r, 250));
-    if (await cdpUp()) return;
+    if (await cdpUp()) return front;
   }
   throw new Error("Chrome did not open its DevTools port");
 }
@@ -51,10 +69,11 @@ let browser: Browser | null = null;
 
 export async function context(): Promise<BrowserContext> {
   if (!browser || !browser.isConnected()) {
-    await ensureChrome();
+    const front = await ensureChrome();
     browser = await chromium.connectOverCDP(CDP);
     await closeOrphanTabs(browser.contexts()[0]!).catch(() => undefined);
     await applyWindowMode(browser.contexts()[0]!).catch(() => undefined);
+    if (front) await restoreFront(front);
   }
   return browser.contexts()[0]!;
 }
