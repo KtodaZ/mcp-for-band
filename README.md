@@ -64,7 +64,7 @@ Then ask Claude "sign me in to BAND". A Chrome window opens on BAND's page. Sign
 
 ### Using it
 
-Ask things like "sync my bands for the last two weeks", "who Q'd in November?", or "draft a comment on Saturday's event with this photo". Claude shows you each draft, and nothing goes to BAND until you approve it.
+Ask things like "sync my bands for the last two weeks", "what's on the calendar this weekend?", or "draft a comment on Saturday's event with this photo". Claude shows you each draft, and nothing goes to BAND until you approve it.
 
 ### From source
 
