@@ -16,7 +16,7 @@ export interface Attachment { path: string; sha256: string; kind: MediaKind; byt
 export interface Uploaded { kind: MediaKind; id: string; url: string; width: number; height: number; title: string }
 
 const PHOTO = /\.(jpe?g|png|gif|heic|webp)$/i;
-const VIDEO = /\.(mp4|mov|m4v|avi|wmv|mpe?g|3gp|mts|ts|flv)$/i;
+const VIDEO = /\.(mp4|mov|m4v|avi|wmv|mpe?g|3gp|mts|flv)$/i;
 
 const sha256File = (p: string) => new Promise<string>((resolve, reject) => {
   const h = crypto.createHash("sha256");
@@ -27,17 +27,23 @@ const sha256File = (p: string) => new Promise<string>((resolve, reject) => {
 export async function attachments(photos: string[] = [], videos: string[] = []): Promise<Attachment[]> {
   const out: Attachment[] = [];
   for (const [kind, list, re] of [["photo", photos, PHOTO], ["video", videos, VIDEO]] as const) {
+    if (!Array.isArray(list) || list.some((x) => typeof x !== "string")) throw new BandError("unsupported", `${kind}s must be a list of file paths`);
     for (const raw of list) {
+      // Check the name before touching the disk: only local photo or video files, never network
+      // paths (on Windows, reading \host\share would contact that host).
+      if (/^(\\\\|\/\/)/.test(raw)) throw new BandError("unsupported", `${raw} is a network path; use a local file`);
       const p = path.resolve(raw);
-      if (!fs.existsSync(p) || !fs.statSync(p).isFile()) throw new BandError("unsupported", `No such file: ${raw}`);
       if (!re.test(p)) throw new BandError("unsupported", `${path.basename(p)} doesn't look like a ${kind}`);
-      out.push({ path: p, sha256: await sha256File(p), kind, bytes: fs.statSync(p).size });
+      const st = fs.statSync(p, { throwIfNoEntry: false });
+      if (!st?.isFile()) throw new BandError("unsupported", `No such file: ${raw}`);
+      out.push({ path: p, sha256: await sha256File(p), kind, bytes: st.size });
     }
   }
   return out;
 }
 
-export const describe = (a: Attachment) => `${path.basename(a.path)}${a.kind === "video" ? ` (${(a.bytes / 1024 ** 2).toFixed(1)} MB)` : ""}`;
+/** Full path and size, so the user sees exactly which file they approve. */
+export const describe = (a: Attachment) => `${a.path} (${a.bytes < 1024 ** 2 ? `${Math.ceil(a.bytes / 1024)} KB` : `${(a.bytes / 1024 ** 2).toFixed(1)} MB`})`;
 
 /**
  * Upload each attachment through BAND's comment box on `pageUrl` (any page in the band with a
@@ -55,6 +61,8 @@ export async function upload(pageUrl: string, items: Attachment[]): Promise<Uplo
     for (const [i, a] of items.entries()) {
       const title = path.basename(a.path);
       const copy = path.join(stage, `${i}${path.extname(a.path)}`);
+      const st = fs.statSync(a.path, { throwIfNoEntry: false });
+      if (!st?.isFile() || st.size !== a.bytes) throw new BandError("unsupported", `${title} changed since it was approved; prepare the write again`);
       try { fs.copyFileSync(a.path, copy); } catch { throw new BandError("unsupported", `Can't read ${title} any more; prepare the write again`); }
       if ((await sha256File(copy)) !== a.sha256) throw new BandError("unsupported", `${title} changed since it was approved; prepare the write again`);
       copies.push({ a: { ...a, path: copy }, title });

@@ -15,7 +15,9 @@ export const CDP_PORT = Number(process.env.BAND_MCP_CDP_PORT ?? 9333);
 export const HTTP_PORT = Number(process.env.BAND_MCP_PORT ?? 47811);
 
 /** Time zone for workout dates and notice times. Defaults to this machine's. */
-export const TIME_ZONE = process.env.BAND_MCP_TZ || Intl.DateTimeFormat().resolvedOptions().timeZone;
+const validZone = (z: string | undefined) => { if (!z) return false; try { new Intl.DateTimeFormat("en-US", { timeZone: z }); return true; } catch { return false; } };
+if (process.env.BAND_MCP_TZ && !validZone(process.env.BAND_MCP_TZ)) console.error(`band-mcp: unknown time zone "${process.env.BAND_MCP_TZ}", using the system's`);
+export const TIME_ZONE = validZone(process.env.BAND_MCP_TZ) ? process.env.BAND_MCP_TZ! : Intl.DateTimeFormat().resolvedOptions().timeZone;
 
 export const CHROME_PATHS = [
   process.env.BAND_MCP_CHROME,
@@ -75,7 +77,7 @@ export function saveSettings(s: Settings) {
 export interface Secrets {
   /** Bearer token for read tools over HTTP. */
   readToken: string;
-  /** Bearer token that also allows prepare_* write tools over HTTP. */
+  /** Bearer token that also allows the write tools (prepare_* and confirm_write) over HTTP. */
   writeToken: string;
 }
 
@@ -96,6 +98,8 @@ export function loadSecrets(): Secrets {
 export function saveSecrets(s: Secrets) {
   ensureDataDir();
   fs.writeFileSync(SECRETS_PATH, JSON.stringify(s, null, 2), { mode: 0o600 });
+  // mode applies only when the file is new; tighten an existing one too.
+  if (process.platform !== "win32") fs.chmodSync(SECRETS_PATH, 0o600);
 }
 
 export function token() {

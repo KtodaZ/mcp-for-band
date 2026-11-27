@@ -20,13 +20,17 @@ export const bands = { type: "array", items: band, description: "Bands to includ
 export const date = (d: string) => ({ type: "string", description: d });
 
 export function resolveBand(ref: unknown): number {
-  if (typeof ref === "number") return ref;
+  if (typeof ref === "number") {
+    if (Number.isSafeInteger(ref) && ref > 0) return ref;
+    throw new BandError("unsupported", `Band number must be a positive whole number, not ${ref}`);
+  }
   const s = String(ref ?? "").trim().toLowerCase();
-  if (/^\d+$/.test(s)) return Number(s);
+  if (/^\d+$/.test(s) && Number(s) > 0 && Number.isSafeInteger(Number(s))) return Number(s);
+  const norm = (x: string) => x.normalize("NFKC").toLowerCase().replace(/[^\p{L}\p{N}]/gu, "");
+  if (!norm(s)) throw new BandError("unsupported", "Name a band, by number or by name");
   const settings = loadSettings();
-  if (settings.aliases[s]) return settings.aliases[s]!;
+  if (Object.hasOwn(settings.aliases, s)) return settings.aliases[s]!;
   const all = store.listBands();
-  const norm = (x: string) => x.toLowerCase().replace(/[^a-z0-9]/g, "");
   const hit = all.filter((b) => norm(b.name).includes(norm(s)));
   if (hit.length === 1) return hit[0]!.band_no;
   if (hit.length > 1) throw new BandError("unsupported", `"${ref}" matches several bands: ${hit.map((b) => `${b.name} (${b.band_no})`).join(", ")}`);
@@ -61,6 +65,9 @@ function zoneOffset(t: number) {
 
 /** Local midnight of a YYYY-MM-DD date, as an ISO instant. */
 export function day(d: string) {
+  if (typeof d !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(d) || new Date(`${d}T00:00:00Z`).toISOString().slice(0, 10) !== d) {
+    throw new BandError("unsupported", `Dates are YYYY-MM-DD, not ${JSON.stringify(d)}`);
+  }
   const guess = Date.parse(`${d}T00:00:00Z`);
   const first = guess - zoneOffset(guess);
   return new Date(guess - zoneOffset(first)).toISOString();

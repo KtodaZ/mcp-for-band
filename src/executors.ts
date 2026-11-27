@@ -39,9 +39,10 @@ const escapeText = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;")
 export function withMentions(text: string, mentions: WritePayload["mentions"] = []) {
   let out = escapeText(text);
   for (const m of mentions) {
+    if (!/^\d+$/.test(String(m.key))) throw new BandError("unsupported", `Bad member key for ${m.name}`);
     const tag = `<band:refer user_no="${m.key}">${escapeText(m.name)}</band:refer>`;
     const at = `@${escapeText(m.name)}`;
-    out = out.includes(at) ? out.replace(at, tag) : `${out} ${tag}`;
+    out = out.includes(at) ? out.replace(at, () => tag) : `${out} ${tag}`;
   }
   return out;
 }

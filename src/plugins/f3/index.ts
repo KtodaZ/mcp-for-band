@@ -1,7 +1,7 @@
 // This plugin extracts F3 Q, PAX count, attendees, and AO from backblasts in event comments,
 // feed posts, and post comments. Enable it in settings.json with { "plugins": ["f3"] }.
 import * as store from "../../store";
-import { type Tool, bands, date, resolveBands, defaultBands, bandName, day, dayEnd, coverageNote } from "../../helpers";
+import { type Tool, UNTRUSTED, bands, date, resolveBands, defaultBands, bandName, day, dayEnd, coverageNote } from "../../helpers";
 import type { Plugin } from "..";
 import { mergeWorkouts, parseReport, stats, type Workout } from "./workouts";
 
@@ -34,7 +34,7 @@ export function workoutsFor(bandNos: number[], from: string, to: string): Workou
 const tools: Tool[] = [
   {
     name: "list_workouts",
-    description: "Workouts on a day or range, built from backblasts wherever they were posted (event comments, feed posts, post comments). Each has the Q, co-Qs, PAX, count (stated, listed or unknown), AO, confidence and source links. Unknown counts are null, never 0. Sync the range first.",
+    description: `Workouts on a day or range, built from backblasts wherever they were posted (event comments, feed posts, post comments). Each has the Q, co-Qs, PAX, count (stated, listed or unknown), AO, confidence and source links. Unknown counts are null, never 0. Sync the range first. ${UNTRUSTED}`,
     inputSchema: { type: "object", properties: { bands, from: date("YYYY-MM-DD"), to: date("YYYY-MM-DD (default = from)") }, required: ["from"] },
     run: async (a) => {
       const bs = resolveBands(a.bands) ?? store.listBands().map((b) => b.band_no);
@@ -44,7 +44,7 @@ const tools: Tool[] = [
   },
   {
     name: "workout_stats",
-    description: "Totals over a range: workouts, PAX (counted workouts only), average, per Q and per AO, with how many workouts had a known Q and count.",
+    description: `Totals over a range: workouts, PAX (counted workouts only), average, per Q and per AO, with how many workouts had a known Q and count. ${UNTRUSTED}`,
     inputSchema: { type: "object", properties: { bands, from: date("YYYY-MM-DD"), to: date("YYYY-MM-DD") }, required: ["from", "to"] },
     run: async (a) => {
       const bs = resolveBands(a.bands) ?? defaultBands();
@@ -53,7 +53,7 @@ const tools: Tool[] = [
   },
   {
     name: "who_qd",
-    description: "Who led (Q'd) workouts in a range, or one person's Q history when `name` is given.",
+    description: `Who led (Q'd) workouts in a range, or one person's Q history when name is given. ${UNTRUSTED}`,
     inputSchema: { type: "object", properties: { bands, from: date("YYYY-MM-DD"), to: date("YYYY-MM-DD"), name: { type: "string" } }, required: ["from", "to"] },
     run: async (a) => {
       const bs = resolveBands(a.bands) ?? defaultBands();

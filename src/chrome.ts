@@ -92,6 +92,10 @@ export async function signIn(timeoutMs = 10 * 60_000): Promise<boolean> {
       if (await signedIn()) return true;
     }
     return false;
+  } catch (e) {
+    // The user closed the tab or window: not signed in.
+    if (page.isClosed() || /closed|Target.*(gone|crashed)/i.test(String((e as Error)?.message))) return false;
+    throw e;
   } finally {
     await place(-2400).catch(() => undefined);
     await page.close().catch(() => undefined);

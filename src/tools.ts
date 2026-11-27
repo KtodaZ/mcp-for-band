@@ -59,6 +59,9 @@ function previewText(action: string, bandNo: number, p: writes.WritePayload, ext
   ].filter(Boolean).join("\n");
 }
 
+/** A whole number from 1 to 200, or the default. */
+const clampLimit = (v: unknown, dflt: number) => Math.max(1, Math.min(200, Math.trunc(Number(v)) || dflt));
+
 function prepared(row: writes.WriteRow, ctx: ToolContext) {
   return {
     write_id: row.id,
@@ -78,6 +81,7 @@ export const TOOLS: Tool[] = [
   },
   {
     name: "sign_in",
+    write: true,
     description: "Open the BAND sign-in window and wait up to 10 minutes for the user to sign in there. Use it when BAND needs sign-in or the user asks to sign in. The user types their own credentials in BAND's page; never ask for them in chat.",
     inputSchema: { type: "object", properties: {} },
     run: async () => (await signIn())
@@ -86,7 +90,7 @@ export const TOOLS: Tool[] = [
   },
   {
     name: "list_bands",
-    description: "Bands the user belongs to, with band number and member count. refresh: true reads BAND again.",
+    description: `Bands the user belongs to, with band number and member count. refresh: true reads BAND again. ${UNTRUSTED}`,
     inputSchema: { type: "object", properties: { refresh: { type: "boolean" } } },
     run: async (a) => {
       if (a.refresh || !store.listBands().length) await sync.syncBands();
@@ -95,7 +99,7 @@ export const TOOLS: Tool[] = [
   },
   {
     name: "sync",
-    description: "Read BAND into the local cache for a band and date range: feed posts and their comments, events and their comments (backblasts), and optionally members. Searches (and plugin tools such as workouts) read the cache, so sync the range first. Rescans overlapping ranges to catch edits and deletions.",
+    description: "Read BAND into the local cache for a band and date range: feed posts and their comments, events and their comments (backblasts), and optionally members. Searches (and plugin tools such as workouts) read the cache, so sync the range first. Rescans overlapping ranges to catch edits, and deletions BAND still reports.",
     inputSchema: { type: "object", properties: { band, from: date("Start date YYYY-MM-DD (default 14 days ago)"), to: date("End date YYYY-MM-DD (default today)"), posts: { type: "boolean", description: "default true" }, events: { type: "boolean", description: "default true" }, members: { type: "boolean", description: "default false" } }, required: ["band"] },
     run: async (a) => {
       const b = resolveBand(a.band);
@@ -115,7 +119,7 @@ export const TOOLS: Tool[] = [
     inputSchema: { type: "object", properties: { query: { type: "string" }, bands, kinds: { type: "array", items: { enum: ["post", "post_comment", "event", "event_comment", "chat"] } }, author: { type: "string" }, from: date("YYYY-MM-DD"), to: date("YYYY-MM-DD"), has_photo: { type: "boolean" }, limit: { type: "number" } } },
     run: async (a) => {
       const bs = resolveBands(a.bands);
-      const rows = store.search({ query: a.query, bands: bs, kinds: a.kinds, author: a.author, from: a.from && day(a.from), to: a.to && dayEnd(a.to), hasPhoto: a.has_photo, limit: a.limit });
+      const rows = store.search({ query: a.query, bands: bs, kinds: a.kinds, author: a.author, from: a.from && day(a.from), to: a.to && dayEnd(a.to), hasPhoto: a.has_photo, limit: clampLimit(a.limit, 25) });
       return { results: rows.map(shortItem), covered: coverageNote(bs ?? store.listBands().map((b) => b.band_no)) };
     },
   },
@@ -134,17 +138,17 @@ export const TOOLS: Tool[] = [
     name: "list_posts",
     description: `Recent cached feed posts for a band, newest first. ${UNTRUSTED}`,
     inputSchema: { type: "object", properties: { band, from: date("YYYY-MM-DD"), to: date("YYYY-MM-DD"), limit: { type: "number" } }, required: ["band"] },
-    run: async (a) => ({ posts: store.search({ bands: [resolveBand(a.band)], kinds: ["post"], from: a.from && day(a.from), to: a.to && dayEnd(a.to), limit: a.limit ?? 20 }).map(shortItem) }),
+    run: async (a) => ({ posts: store.search({ bands: [resolveBand(a.band)], kinds: ["post"], from: a.from && day(a.from), to: a.to && dayEnd(a.to), limit: clampLimit(a.limit, 20) }).map(shortItem) }),
   },
   {
     name: "get_notices",
-    description: "The band's current notices (pinned posts), read live from BAND: post id, title, whether it's a major notice, and since when.",
+    description: `The band's current notices (pinned posts), read live from BAND: post id, title, whether it's a major notice, and since when. ${UNTRUSTED}`,
     inputSchema: { type: "object", properties: { band }, required: ["band"] },
     run: async (a) => ({ notices: await sync.liveNotices(resolveBand(a.band)) }),
   },
   {
     name: "find_member",
-    description: "Look up band members by name (for tagging). Sync with members: true first.",
+    description: `Look up band members by name (for tagging). Sync with members: true first. ${UNTRUSTED}`,
     inputSchema: { type: "object", properties: { band, name: { type: "string" } }, required: ["band", "name"] },
     run: async (a) => ({ members: store.findMembers(resolveBand(a.band), a.name) }),
   },
@@ -162,10 +166,12 @@ export const TOOLS: Tool[] = [
       const ctx = await context();
       const files: string[] = [];
       for (const [i, u] of urls.entries()) {
-        if (!/^https?:\/\/[\w.-]+\.(band\.us|pstatic\.net|naver\.net|campmobile\.net)\//.test(u)) continue;
-        const res = await ctx.request.get(u);
-        if (!res.ok()) continue;
-        const ext = (res.headers()["content-type"] ?? "").includes("png") ? "png" : "jpg";
+        // BAND's own image hosts only, over HTTPS, no redirects, images up to 50 MB.
+        if (!/^https:\/\/[\w.-]+\.(band\.us|pstatic\.net|naver\.net|campmobile\.net)\//.test(u)) continue;
+        const res = await ctx.request.get(u, { maxRedirects: 0, timeout: 60_000 });
+        const type = res.headers()["content-type"] ?? "";
+        if (!res.ok() || !type.startsWith("image/") || Number(res.headers()["content-length"] ?? 0) > 50 * 1024 ** 2) continue;
+        const ext = type.includes("png") ? "png" : type.includes("gif") ? "gif" : type.includes("webp") ? "webp" : "jpg";
         const f = path.join(dir, `${i + 1}.${ext}`);
         fs.writeFileSync(f, await res.body());
         files.push(f);
@@ -265,6 +271,9 @@ export const TOOLS: Tool[] = [
     description: "Send prepared writes to BAND once the user has approved them. Pass one write_id, or write_ids for a batch (up to 50) that the user approves with one yes. If the client supports elicitation, it asks them once for the whole batch. Otherwise pass user_approved: true, and only after the user said yes in chat to these exact previews. Writes run in order; one failing doesn't stop the rest. Never claim the user approved.",
     inputSchema: { type: "object", properties: { write_id: { type: "string" }, write_ids: { type: "array", items: { type: "string" }, maxItems: 50 }, user_approved: { type: "boolean", description: "The user said yes in chat to these exact previews" } } },
     run: async (a, ctx) => {
+      if ((a.write_ids !== undefined && (!Array.isArray(a.write_ids) || a.write_ids.some((x: unknown) => typeof x !== "string"))) || (a.write_id !== undefined && typeof a.write_id !== "string")) {
+        throw new BandError("unsupported", "write_id must be a string and write_ids a list of strings");
+      }
       const ids: string[] = [...new Set<string>([...(a.write_ids ?? []), ...(a.write_id ? [a.write_id] : [])])];
       if (!ids.length) throw new BandError("unsupported", "Pass write_id or write_ids");
       if (ids.length > 50) throw new BandError("unsupported", "At most 50 writes per batch");
@@ -275,9 +284,10 @@ export const TOOLS: Tool[] = [
           ? `Approve this BAND write?\n\n${pending[0]!.preview}`
           : `Approve these ${pending.length} BAND writes?\n\n${pending.map((r, i) => `${i + 1}. ${r.preview}`).join("\n\n")}`;
         const answer = await ctx.elicit(msg);
-        for (const r of pending) writes.decide(r.id, answer === "accept", "elicitation");
+        // A cancelled or failed prompt decides nothing; the drafts stay pending.
+        if (answer !== "cancel") writes.decideAll(pending.map((r) => r.id), answer === "accept", "elicitation");
       } else if (pending.length && a.user_approved === true) {
-        for (const r of pending) writes.decide(r.id, true, "chat");
+        writes.decideAll(pending.map((r) => r.id), true, "chat");
       }
       rows = ids.map((id) => writes.get(id)!);
       if (rows.some((r) => r.status === "pending")) {
@@ -304,7 +314,7 @@ export const TOOLS: Tool[] = [
     name: "list_writes",
     description: "Recent prepared and sent writes with their status (journal).",
     inputSchema: { type: "object", properties: { limit: { type: "number" } } },
-    run: async (a) => ({ writes: writes.list(a.limit ?? 20) }),
+    run: async (a) => ({ writes: writes.list(clampLimit(a.limit, 20)) }),
   },
 ];
 

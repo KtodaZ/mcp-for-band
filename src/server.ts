@@ -3,6 +3,7 @@
 // approves a write by saying yes in chat.
 import http from "node:http";
 import crypto from "node:crypto";
+import { execFileSync } from "node:child_process";
 import os from "node:os";
 
 import readline from "node:readline";
@@ -74,8 +75,9 @@ export function serveStdio() {
     if (!line.trim()) return;
     let msg: any;
     try { msg = JSON.parse(line); } catch { return send(fail(null, -32700, "Parse error")); }
+    if (!isMessage(msg)) return send(fail(null, -32600, "Invalid request"));
     // Responses to our elicitation requests.
-    if (msg.id !== undefined && !msg.method && waiting.has(msg.id)) { const f = waiting.get(msg.id)!; waiting.delete(msg.id); return f(msg); }
+    if (msg.id != null && !msg.method && waiting.has(msg.id)) { const f = waiting.get(msg.id)!; waiting.delete(msg.id); return f(msg); }
     if (msg.method === "initialize") clientCanElicit = !!msg.params?.capabilities?.elicitation;
     void handle(msg, ctx()).then((r) => r && send(r));
   });
@@ -83,10 +85,27 @@ export function serveStdio() {
 }
 
 // ── HTTP ──────────────────────────────────────────────────────────────────
-/** Tailscale addresses, only when BAND_MCP_TAILSCALE=1. Otherwise the HTTP server stays on 127.0.0.1. */
+/** A JSON-RPC message: an object, not null, an array or a bare value. */
+const isMessage = (m: unknown): m is Rpc => !!m && typeof m === "object" && !Array.isArray(m);
+
+/**
+ * This machine's Tailscale IPv4 addresses, only when BAND_MCP_TAILSCALE=1. Otherwise the HTTP
+ * server stays on 127.0.0.1. Asks the tailscale CLI, falling back to interfaces named Tailscale;
+ * never every 100.64.0.0/10 address, which ISPs and VPNs use too.
+ */
+let tailnetCache: string[] | undefined;
 function tailnetIps() {
   if (process.env.BAND_MCP_TAILSCALE !== "1") return [];
-  return Object.values(os.networkInterfaces()).flat().filter((a) => a && a.family === "IPv4" && /^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./.test(a.address)).map((a) => a!.address);
+  if (tailnetCache) return tailnetCache;
+  let ips: string[] = [];
+  try {
+    ips = execFileSync("tailscale", ["ip", "-4"], { encoding: "utf8", timeout: 5000, stdio: ["ignore", "pipe", "ignore"] }).split(/\s+/).filter((x) => /^\d+\.\d+\.\d+\.\d+$/.test(x));
+  } catch { /* no CLI on PATH */ }
+  if (!ips.length) {
+    ips = Object.entries(os.networkInterfaces()).filter(([name]) => /tailscale/i.test(name))
+      .flatMap(([, addrs]) => (addrs ?? []).filter((a) => a.family === "IPv4").map((a) => a.address));
+  }
+  return (tailnetCache = ips);
 }
 
 function allowedHost(host: string | undefined) {
@@ -114,13 +133,27 @@ export function serveHttp(port = HTTP_PORT) {
       const url = new URL(req.url ?? "/", "http://x");
       if (url.pathname === "/mcp") {
         if (req.method !== "POST") { res.writeHead(405).end(); return; }
+        // Browsers send Origin; a page on another site gets nothing, even with a token.
+        const origin = req.headers.origin;
+        if (origin) {
+          let ok = false;
+          try { ok = allowedHost(new URL(origin).host); } catch { /* bad Origin */ }
+          if (!ok) { res.writeHead(403).end("Forbidden origin"); return; }
+        }
         const bearer = /^Bearer\s+(.+)$/i.exec(req.headers.authorization ?? "")?.[1];
-        const same = (a: string | undefined, b: string) => !!a && a.length === b.length && crypto.timingSafeEqual(Buffer.from(a), Buffer.from(b));
+        const same = (a: string | undefined, b: string) => {
+          if (!a) return false;
+          const x = Buffer.from(a), y = Buffer.from(b);
+          return x.length === y.length && crypto.timingSafeEqual(x, y);
+        };
         const canWrite = same(bearer, secrets.writeToken);
         if (!canWrite && !same(bearer, secrets.readToken)) { res.writeHead(401).end("Unauthorized"); return; }
-        const body = JSON.parse(await readBody(req));
+        let body: unknown;
+        try { body = JSON.parse(await readBody(req)); } catch { res.writeHead(400, { "content-type": "application/json" }).end(JSON.stringify(fail(null, -32700, "Parse error"))); return; }
+        if (Array.isArray(body) && (body.length > 20 || !body.every(isMessage))) { res.writeHead(400, { "content-type": "application/json" }).end(JSON.stringify(fail(null, -32600, "Batches hold up to 20 requests"))); return; }
+        if (!Array.isArray(body) && !isMessage(body)) { res.writeHead(400, { "content-type": "application/json" }).end(JSON.stringify(fail(null, -32600, "Invalid request"))); return; }
         const ctx: ToolContext = { canWrite };
-        const out = Array.isArray(body) ? (await Promise.all(body.map((m) => handle(m, ctx)))).filter(Boolean) : await handle(body, ctx);
+        const out = Array.isArray(body) ? (await Promise.all(body.map((m) => handle(m as Rpc, ctx)))).filter(Boolean) : await handle(body, ctx);
         if (!out || (Array.isArray(out) && !out.length)) { res.writeHead(202).end(); return; }
         res.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify(out));
         return;
@@ -132,6 +165,8 @@ export function serveHttp(port = HTTP_PORT) {
     }
   };
   const hosts = ["127.0.0.1", ...tailnetIps()];
-  const servers = hosts.map((h) => http.createServer(handler).listen(port, h));
+  const servers = hosts.map((h) => http.createServer(handler)
+    .on("error", (e) => { console.error(`band-mcp: can't listen on ${h}:${port}: ${(e as Error).message}`); process.exitCode = 1; })
+    .listen(port, h));
   return { servers, hosts };
 }

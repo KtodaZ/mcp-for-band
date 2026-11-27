@@ -37,7 +37,7 @@
     { "name": "get_item", "description": "One post, comment or event" },
     { "name": "get_notices", "description": "A band's notices" },
     { "name": "find_member", "description": "Find a band member" },
-    { "name": "get_media", "description": "Download a post's photos or videos" },
+    { "name": "get_media", "description": "Download a post's photos" },
     { "name": "prepare_post", "description": "Draft a post" },
     { "name": "prepare_comment", "description": "Draft a comment or reply" },
     { "name": "prepare_edit_post", "description": "Draft a post edit" },

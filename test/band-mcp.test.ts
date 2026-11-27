@@ -102,6 +102,18 @@ describe("cache and search", () => {
     expect(ws.workouts[0]).toMatchObject({ q: ["Gravel"], count: 6 });
   });
 
+  it("falls back to plain words when FTS syntax doesn't parse, and checks band names and dates", async () => {
+    expect(() => store.search({ query: 'recap AND', bands: [BAND] })).not.toThrow();
+    expect(() => store.search({ query: '"unclosed', bands: [BAND] })).not.toThrow();
+    const h = await import("../src/helpers");
+    expect(() => h.resolveBand("constructor")).toThrow(/Unknown band/);
+    expect(() => h.resolveBand(-5)).toThrow(/positive/);
+    expect(() => h.resolveBand("  ")).toThrow(/Name a band/);
+    expect(h.resolveBand("test region")).toBe(BAND);
+    expect(() => h.day("2026-02-30")).toThrow(/YYYY-MM-DD/);
+    expect(() => h.day("next week")).toThrow(/YYYY-MM-DD/);
+  });
+
   it("marks items BAND stopped returning as deleted", () => {
     expect(store.markMissingDeleted(BAND, "post", null, [])).toBe(1);
     expect(store.search({ query: "big huddle" })).toHaveLength(0);
@@ -196,8 +208,8 @@ describe("writes", () => {
     await expect(tools.callTool("prepare_post", { band: BAND, text: "x", photos: [path.join(dir, "nope.jpg")] }, ctx)).rejects.toThrow(/No such file/);
     await expect(tools.callTool("prepare_post", { band: BAND, text: "x", photos: [mp4] }, ctx)).rejects.toThrow(/doesn't look like a photo/);
     const r = (await tools.callTool("prepare_post", { band: BAND, text: "Recap", photos: [jpg], videos: [mp4] }, ctx)) as any;
-    expect(r.preview).toContain("Photos: a.jpg");
-    expect(r.preview).toMatch(/Videos: b\.mp4 \(0\.0 MB\)/);
+    expect(r.preview).toMatch(/Photos: .*a\.jpg \(1 KB\)/);
+    expect(r.preview).toMatch(/Videos: .*b\.mp4 \(1 KB\)/);
     await expect(tools.callTool("prepare_comment", { id: `post:${BAND}:2`, text: "x", photos: [jpg], videos: [mp4] }, ctx)).rejects.toThrow(/several photos or one video/);
     await expect(tools.callTool("prepare_edit_post", { id: `post:${BAND}:2`, text: "x", photos: [jpg] }, ctx)).rejects.toThrow(/Edits can't add/);
 

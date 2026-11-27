@@ -31,7 +31,7 @@ Restart the server or MCP client. `status` lists enabled plugins, and an unknown
      inputSchema: { type: "object", properties: { bands } },
      run: async (a) => {
        const bs = resolveBands(a.bands) ?? defaultBands();
-       return { counts: bs.map((b) => store.search({ bands: [b], kinds: ["post"], limit: 1000 }).length), covered: coverageNote(bs) };
+       return { counts: bs.map((b) => store.search({ bands: [b], kinds: ["post"], limit: 200 }).length), covered: coverageNote(bs) };
      },
    }];
 

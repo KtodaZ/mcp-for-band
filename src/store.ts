@@ -143,14 +143,24 @@ export function search(o: SearchOpts) {
   if (o.hasPhoto) where.push("i.photo_count > 0");
   const order = o.query?.trim() ? "ORDER BY bm25(items_fts), i.created_at DESC" : "ORDER BY i.created_at DESC";
   args.push(Math.min(o.limit ?? 25, 200));
-  return d.prepare(`SELECT i.id, i.kind, i.band_no, i.parent_id, i.author, i.title, i.body, i.created_at, i.url, i.photo_count, i.video_count
-    FROM ${from} WHERE ${where.join(" AND ")} ${order} LIMIT ?`).all(...args) as Record<string, any>[];
+  const sql = `SELECT i.id, i.kind, i.band_no, i.parent_id, i.author, i.title, i.body, i.created_at, i.url, i.photo_count, i.video_count
+    FROM ${from} WHERE ${where.join(" AND ")} ${order} LIMIT ?`;
+  try {
+    return d.prepare(sql).all(...args) as Record<string, any>[];
+  } catch (e) {
+    // A query with FTS syntax that doesn't parse ("a AND", an unclosed quote): search its words instead.
+    if (!o.query?.trim() || !/fts5|syntax|unterminated|no such column/i.test(String((e as Error).message))) throw e;
+    args[args.indexOf(ftsQuery(o.query))] = plainQuery(o.query);
+    return d.prepare(sql).all(...args) as Record<string, any>[];
+  }
 }
+
+const plainQuery = (q: string) => q.split(/\s+/).map((w) => w.replace(/["*()]/g, "")).filter(Boolean).map((w) => `"${w}"*`).join(" ") || '""';
 
 /** Plain words become prefix-matched AND terms; quoted phrases and FTS operators pass through. */
 export function ftsQuery(q: string) {
   if (/["*()]|\b(AND|OR|NOT|NEAR)\b/.test(q)) return q;
-  return q.split(/\s+/).filter(Boolean).map((w) => `"${w.replace(/"/g, "")}"*`).join(" ");
+  return plainQuery(q);
 }
 
 export function getItem(id: string) {
