@@ -1,0 +1,24 @@
+{
+  "name": "mcp-for-band",
+  "version": "0.1.0",
+  "description": "Unofficial MCP server for BAND (band.us): search, sync and post as yourself through your own signed-in Chrome, with approval for every write",
+  "license": "MIT",
+  "type": "module",
+  "bin": { "band-mcp": "bin/band-mcp.mjs" },
+  "files": ["bin", "src", "docs", "README.md", "LICENSE"],
+  "engines": { "node": ">=24" },
+  "scripts": {
+    "start": "tsx src/main.ts serve",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "playwright-core": "1.63.0",
+    "tsx": "^4.23.15"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.0",
+    "typescript": "^6.0.3",
+    "vitest": "^5.0.2"
+  }
+}
