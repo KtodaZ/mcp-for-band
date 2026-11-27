@@ -64,7 +64,7 @@ export function loadSettings(): Settings {
     const aliases = s.aliases && typeof s.aliases === "object" && !Array.isArray(s.aliases) ? s.aliases : {};
     return {
       backgroundBands: ints(s.backgroundBands),
-      syncIntervalMinutes: Number.isFinite(s.syncIntervalMinutes) && s.syncIntervalMinutes > 0 ? Math.max(5, Math.round(s.syncIntervalMinutes)) : 0,
+      syncIntervalMinutes: Number.isFinite(s.syncIntervalMinutes) && s.syncIntervalMinutes > 0 ? Math.min(10_080, Math.max(5, Math.round(s.syncIntervalMinutes))) : 0, // 5 minutes to a week; Node runs longer timers at once
       aliases: Object.fromEntries(Object.entries(aliases).filter(([, v]) => Number.isInteger(v)).map(([k, v]) => [k.toLowerCase(), v as number])),
       allowDestructive: s.allowDestructive === true,
       window: s.window === "visible" ? "visible" : "minimized",

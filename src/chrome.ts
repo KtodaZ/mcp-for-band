@@ -27,16 +27,24 @@ const jxa = (code: string) => new Promise<string>((resolve) => {
 const frontPid = async () => Number(await jxa("$.NSWorkspace.sharedWorkspace.frontmostApplication.processIdentifier")) || null;
 const activatePid = (pid: number) => jxa(`$.NSRunningApplication.runningApplicationWithProcessIdentifier(${pid}).activateWithOptions(0)`);
 
-/** Put the app that was in front before Chrome started back in front. Chrome can take focus a moment after it's up, so check a few times. */
-async function restoreFront(pid: number) {
+/**
+ * Put the app that was in front before Chrome started back in front, but only while the Chrome we
+ * started is the one in front. Chrome can take focus a moment after it's up, so check a few times.
+ * If the user switches to another app meanwhile, leave it.
+ */
+async function restoreFront({ prev, chrome }: Launch) {
   for (let i = 0; i < 4; i++) {
-    if ((await frontPid()) !== pid) await activatePid(pid);
+    const now = await frontPid();
+    if (now === chrome) await activatePid(prev);
+    else if (now !== prev) return;
     await new Promise((r) => setTimeout(r, 500));
   }
 }
 
-/** Start Chrome if it isn't running. Returns the pid of the app that was in front, on macOS, when it started Chrome. */
-export async function ensureChrome(): Promise<number | null> {
+type Launch = { prev: number; chrome: number };
+
+/** Start Chrome if it isn't running. On macOS, returns the app that was in front and Chrome's pid, so focus can go back. */
+export async function ensureChrome(): Promise<Launch | null> {
   if (await cdpUp()) return null;
   ensureDataDir();
   const exe = CHROME_PATHS.find((p) => fs.existsSync(p));
@@ -60,7 +68,7 @@ export async function ensureChrome(): Promise<number | null> {
   child.unref();
   for (let i = 0; i < 40; i++) {
     await new Promise((r) => setTimeout(r, 250));
-    if (await cdpUp()) return front;
+    if (await cdpUp()) return front && child.pid ? { prev: front, chrome: child.pid } : null;
   }
   throw new Error("Chrome did not open its DevTools port");
 }
@@ -69,11 +77,11 @@ let browser: Browser | null = null;
 
 export async function context(): Promise<BrowserContext> {
   if (!browser || !browser.isConnected()) {
-    const front = await ensureChrome();
+    const launch = await ensureChrome();
     browser = await chromium.connectOverCDP(CDP);
     await closeOrphanTabs(browser.contexts()[0]!).catch(() => undefined);
     await applyWindowMode(browser.contexts()[0]!).catch(() => undefined);
-    if (front) await restoreFront(front);
+    if (launch) await restoreFront(launch);
   }
   return browser.contexts()[0]!;
 }
@@ -87,9 +95,22 @@ export async function ownPage(ctx?: BrowserContext): Promise<Page> {
   const mark = `window.name = "bmcp-${process.pid}"`;
   await page.addInitScript(mark);
   await page.evaluate(mark).catch(() => undefined);
-  // Opening a tab restores a minimized window, so minimize it again.
-  if (windowMode() === "minimized") await setWindow(page, { windowState: "minimized" }).catch(() => undefined);
+  // Opening a tab can restore a minimized window, so minimize it again.
+  if (windowMode() === "minimized") await minimize(page);
   return page;
+}
+
+/** A sign-in tab marks itself so other processes don't minimize the window while the user signs in. */
+const SIGNIN = /^bmcp-signin-(\d+)$/;
+const nameOf = (p: Page) => p.evaluate("window.name").catch(() => null) as Promise<string | null>;
+
+/** Minimize the window unless a live process is waiting for the user to sign in. */
+async function minimize(page: Page) {
+  for (const p of page.context().pages()) {
+    const pid = SIGNIN.exec((await nameOf(p)) ?? "")?.[1];
+    if (pid && alive(Number(pid))) return;
+  }
+  await setWindow(page, { windowState: "minimized" }).catch(() => undefined);
 }
 
 /**
@@ -123,14 +144,13 @@ async function newTab(ctx: BrowserContext): Promise<Page> {
 
 const alive = (pid: number) => { try { process.kill(pid, 0); return true; } catch (e) { return (e as NodeJS.ErrnoException).code === "EPERM"; } };
 
-/** Close tabs left by server processes that are gone: marked with a dead pid, or unmarked BAND tabs from older versions. */
+/** Close tabs left by server processes that are gone. Unmarked tabs may be the user's own, so they stay. */
 async function closeOrphanTabs(ctx: BrowserContext) {
   const pages = ctx.pages();
   const doomed: Page[] = [];
   for (const p of pages) {
-    const name = await p.evaluate("window.name").catch(() => null) as string | null;
-    const pid = /^bmcp-(\d+)$/.exec(name ?? "")?.[1];
-    if (pid ? !alive(Number(pid)) : name === "" && /^https:\/\/(www|auth)\.band\.us\//.test(p.url())) doomed.push(p);
+    const pid = /^bmcp-(?:signin-)?(\d+)$/.exec((await nameOf(p)) ?? "")?.[1];
+    if (pid && !alive(Number(pid))) doomed.push(p);
   }
   // Keep one tab, or Chrome closes the window and quits.
   if (doomed.length && doomed.length === pages.length) await newTab(ctx);
@@ -167,7 +187,8 @@ async function setWindow(page: Page, bounds: Bounds) {
 /** Put the server's Chrome window in the configured state: minimized, or left as an ordinary window. */
 async function applyWindowMode(ctx: BrowserContext) {
   const page = ctx.pages()[0] ?? (await newTab(ctx));
-  await setWindow(page, { windowState: windowMode() === "minimized" ? "minimized" : "normal" });
+  if (windowMode() === "minimized") await minimize(page);
+  else await setWindow(page, { windowState: "normal" });
 }
 
 /** This process's own BAND tab, kept open between calls. */
@@ -193,6 +214,9 @@ export async function disconnect() {
  */
 export async function signIn(timeoutMs = 10 * 60_000): Promise<boolean> {
   const page = await ownPage();
+  const mark = `window.name = "bmcp-signin-${process.pid}"`;
+  await page.addInitScript(mark); // runs after ownPage's mark, so this name wins
+  await page.evaluate(mark).catch(() => undefined);
   const signedIn = async () => /^https:\/\/www\.band\.us\/(home|band|discover|feed)/.test(page.url()) && !(await page.$("a[href*='login'], .loginBtn").catch(() => null));
   try {
     await page.goto("https://www.band.us/home");

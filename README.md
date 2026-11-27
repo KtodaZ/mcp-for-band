@@ -78,7 +78,7 @@ Edit `settings.json` in the data folder:
 ```
 
 - `backgroundBands` lists your main bands. Plugin tools such as workout stats default to them.
-- `syncIntervalMinutes` turns on background sync: while `serve` runs, it re-syncs `backgroundBands` for the last 14 days every this many minutes (at least 5). It's `0`, off, by default, and changes apply without a restart. You rarely need it, since the model runs `sync` when a question needs fresh data, and it reads BAND on a schedule even when nobody is asking.
+- `syncIntervalMinutes` turns on background sync: while `serve` runs, it re-syncs `backgroundBands` for the last 14 days every this many minutes (5 to 10080, a week). It's `0`, off, by default, and changes apply without a restart. You rarely need it, since the model runs `sync` when a question needs fresh data, and it reads BAND on a schedule even when nobody is asking.
 - `plugins` lists optional tool sets to turn on; see [docs/plugins.md](docs/plugins.md). None are on by default.
 - `aliases` sets short names for bands. Lookups also match partial band names.
 - `allowDestructive` enables deletes when `true`, as does `BAND_MCP_ALLOW_DESTRUCTIVE=1`.
