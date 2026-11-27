@@ -37,26 +37,29 @@ All data stays on your computer in the data folder: the browser profile, cache, 
 
 ## Setup
 
-You need Google Chrome. mcp-for-band isn't on npm; get it from this repo.
+You need Google Chrome and [Node 24](https://nodejs.org) or later.
 
-### Claude Desktop (easiest)
-
-1. Download `mcp-for-band.mcpb` from the [latest release](https://github.com/KtodaZ/mcp-for-band/releases/latest).
-2. Double-click it, or drag it into Claude Desktop's Settings > Extensions, and click Install.
-
-It doesn't update itself. Download the new `.mcpb` when a release comes out.
-
-### Claude Code and other MCP clients
-
-You need [Node 24](https://nodejs.org) or later.
+### Claude Code
 
 ```sh
-git clone https://github.com/KtodaZ/mcp-for-band && cd mcp-for-band
-npm ci
-claude mcp add band -- node "$PWD/bin/band-mcp.mjs" stdio
+claude mcp add band -- npx -y mcp-for-band@latest stdio
 ```
 
-For another client, have it run `node /path/to/mcp-for-band/bin/band-mcp.mjs stdio`. To update, run `git pull && npm ci` in the folder.
+### Other MCP clients
+
+Add a stdio server that runs `npx -y mcp-for-band@latest stdio`. In Claude Desktop's `claude_desktop_config.json`:
+
+```json
+{ "mcpServers": { "band": { "command": "npx", "args": ["-y", "mcp-for-band@latest", "stdio"] } } }
+```
+
+On Windows, use `cmd` as the command with `/c npx …` as its arguments (in Claude Code, `claude mcp add band -- cmd /c npx -y mcp-for-band@latest stdio`).
+
+With `@latest`, the client picks up new versions when it restarts. Each version is published from this repo's GitHub Actions with [npm provenance](https://docs.npmjs.com/generating-provenance-statements), so npm shows which commit it was built from.
+
+### Claude Desktop extension
+
+Instead of the config, download `mcp-for-band.mcpb` from the [latest release](https://github.com/KtodaZ/mcp-for-band/releases/latest) and double-click it. It doesn't update itself.
 
 Then ask Claude "sign me in to BAND". A Chrome window opens on BAND's page. Sign in there, and the window minimizes again.
 
@@ -70,7 +73,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ### Optional HTTP mode
 
-`band-mcp serve` runs HTTP on `127.0.0.1:47811` with bearer tokens in `secrets.json` in the data folder. Use `readToken` for reads or `writeToken` to allow writes. Set `BAND_MCP_TAILSCALE=1` to listen on Tailscale addresses too. The server never listens on other networks.
+`npx mcp-for-band serve` runs HTTP on `127.0.0.1:47811` with bearer tokens in `secrets.json` in the data folder. Use `readToken` for reads or `writeToken` to allow writes. Set `BAND_MCP_TAILSCALE=1` to listen on Tailscale addresses too. The server never listens on other networks.
 
 ### Settings
 

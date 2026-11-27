@@ -1,0 +1,34 @@
+# Publishes to npm when a GitHub release is published. Uses npm trusted publishing (OIDC), so
+# there's no npm token in the repo, and each version gets a provenance record tying it to this
+# workflow run.
+name: Publish to npm
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.release.tag_name }}
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+      - run: npm install -g npm@11
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - name: Check the tag matches package.json
+        run: test "v$(node -p "require('./package.json').version")" = "${{ github.event.release.tag_name }}"
+      - name: Publish unless this version is already on npm
+        run: |
+          v="$(node -p "require('./package.json').version")"
+          if npm view "mcp-for-band@$v" version >/dev/null 2>&1; then echo "$v is already on npm"; else npm publish; fi

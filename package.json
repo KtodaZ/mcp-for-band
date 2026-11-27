@@ -1,9 +1,22 @@
 {
   "name": "mcp-for-band",
   "version": "0.1.1",
-  "private": true,
   "description": "Unofficial MCP server for BAND (band.us): search, sync and post as yourself through your own signed-in Chrome, with approval for every write",
   "license": "MIT",
+  "author": "KtodaZ",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/KtodaZ/mcp-for-band.git"
+  },
+  "homepage": "https://github.com/KtodaZ/mcp-for-band#readme",
+  "bugs": "https://github.com/KtodaZ/mcp-for-band/issues",
+  "keywords": [
+    "mcp",
+    "band",
+    "band.us",
+    "claude",
+    "model-context-protocol"
+  ],
   "type": "module",
   "bin": {
     "band-mcp": "bin/band-mcp.mjs"
@@ -28,11 +41,15 @@
   },
   "dependencies": {
     "playwright-core": "1.63.0",
-    "tsx": "^4.23.15"
+    "tsx": "4.23.15"
   },
   "devDependencies": {
     "@types/node": "^24.10.0",
     "typescript": "^6.0.3",
     "vitest": "^5.0.2"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
   }
 }
