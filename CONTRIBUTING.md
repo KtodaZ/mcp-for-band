@@ -2,6 +2,16 @@
 
 Issues and pull requests are welcome, with no promises on response time or features. If you want it to work differently, fork it and make it yours.
 
+## Sending a change
+
+1. Fork [KtodaZ/mcp-for-band](https://github.com/KtodaZ/mcp-for-band) on GitHub.
+2. Clone your fork and make a branch: `git checkout -b my-change`.
+3. Make the change. Run `npm run typecheck` and `npm test`.
+4. Push the branch to your fork and open a pull request against `main`. The template asks what changed and how you tested it.
+5. CI runs the typecheck and tests on Linux, Windows and macOS. A pull request merges only when CI passes.
+
+For a big change, open an issue first so we can agree on the approach.
+
 ## Run from source
 
 You need Node 24 or later and Google Chrome.
