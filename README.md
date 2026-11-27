@@ -39,23 +39,33 @@ All data stays on your computer in the data folder: the browser profile, cache, 
 
 ## Setup
 
-You need Google Chrome.
-
-### Claude Desktop (easiest)
-
-1. Download `mcp-for-band.mcpb` from the [latest release](https://github.com/KtodaZ/mcp-for-band/releases/latest).
-2. Double-click it, or drag it into Claude Desktop's Settings > Extensions, and click Install.
-3. Ask Claude "sign me in to BAND". A Chrome window opens on BAND's page. Sign in there, and the window minimizes again.
+You need Google Chrome and [Node 24](https://nodejs.org) or later. The server comes from npm as `mcp-for-band`, and `npx` keeps it up to date.
 
 ### Claude Code
-
-You need Node 24 or later. Run:
 
 ```sh
 claude mcp add band -- npx -y mcp-for-band stdio
 ```
 
-Then ask Claude "sign me in to BAND".
+### Claude Desktop and other MCP clients
+
+Add this to the client's MCP config. In Claude Desktop, that's Settings > Developer > Edit Config (`claude_desktop_config.json`):
+
+```json
+{
+  "mcpServers": {
+    "band": { "command": "npx", "args": ["-y", "mcp-for-band", "stdio"] }
+  }
+}
+```
+
+Restart the client after you save it. On Windows, if it doesn't start, use `"command": "cmd"` with `"args": ["/c", "npx", "-y", "mcp-for-band", "stdio"]`.
+
+Then ask Claude "sign me in to BAND". A Chrome window opens on BAND's page. Sign in there, and the window minimizes again.
+
+### Without Node
+
+For Claude Desktop only: download `mcp-for-band.mcpb` from the [latest release](https://github.com/KtodaZ/mcp-for-band/releases/latest) and double-click it, or drag it into Settings > Extensions. It doesn't update itself, so download each new release.
 
 ### Using it
 
