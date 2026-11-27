@@ -297,6 +297,9 @@ export const TOOLS: Tool[] = [
         const answer = await ctx.elicit(msg);
         // A cancelled or failed prompt decides nothing; the drafts stay pending.
         if (answer !== "cancel") writes.decideAll(pending.map((r) => r.id), answer === "accept", "elicitation");
+        // Some clients (T3 Code, for one) advertise the approval box but cancel it without showing
+        // anything. A yes in chat then still counts; a decline in the box always wins.
+        else if (a.user_approved === true) writes.decideAll(pending.map((r) => r.id), true, "chat");
       } else if (pending.length && a.user_approved === true) {
         writes.decideAll(pending.map((r) => r.id), true, "chat");
       }
