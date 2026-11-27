@@ -35,6 +35,8 @@ Other commands:
 
 To keep a source checkout's data apart from an installed copy, set `BAND_MCP_DIR` to another folder.
 
+For notes about your own setup that coding agents should know, such as your test band's number, create `AGENTS.local.md`. Git ignores it, and `CLAUDE.md` loads it for Claude Code.
+
 ## Layout
 
 - `src/band.ts`: requests through BAND's web client in the page.

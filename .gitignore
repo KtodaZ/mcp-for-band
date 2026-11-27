@@ -6,3 +6,5 @@ node_modules/
 *.mp4
 dist/
 *.mcpb
+AGENTS.local.md
+CLAUDE.local.md

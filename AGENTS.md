@@ -2,6 +2,8 @@
 
 For coding agents working in this repo. Setup, layout and commands are in [CONTRIBUTING.md](CONTRIBUTING.md).
 
+If `AGENTS.local.md` exists, read it too. It holds one person's machine-specific notes and is git-ignored, so keep anything private there, never in tracked files.
+
 ## Check your work
 
 - Run `npm run typecheck` and `npm test` after every change. Both must pass.
