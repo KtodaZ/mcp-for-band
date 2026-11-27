@@ -1,12 +1,24 @@
 {
   "name": "mcp-for-band",
   "version": "0.1.0",
+  "private": true,
   "description": "Unofficial MCP server for BAND (band.us): search, sync and post as yourself through your own signed-in Chrome, with approval for every write",
   "license": "MIT",
   "type": "module",
-  "bin": { "band-mcp": "bin/band-mcp.mjs" },
-  "files": ["bin", "src", "docs", "README.md", "LICENSE", "manifest.json"],
-  "engines": { "node": ">=24" },
+  "bin": {
+    "band-mcp": "bin/band-mcp.mjs"
+  },
+  "files": [
+    "bin",
+    "src",
+    "docs",
+    "README.md",
+    "LICENSE",
+    "manifest.json"
+  ],
+  "engines": {
+    "node": ">=24"
+  },
   "scripts": {
     "start": "tsx src/main.ts serve",
     "typecheck": "tsc -p tsconfig.json",
