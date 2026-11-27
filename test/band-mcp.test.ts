@@ -253,6 +253,12 @@ describe("writes", () => {
     await expect(tools.callTool("who_qd", { from: "2026-11-01", to: "2026-11-30" }, ctx)).rejects.toThrow(/Unknown tool/);
     fs.writeFileSync(settingsPath, JSON.stringify({ plugins: ["nope"] }));
     expect(() => names()).toThrow(/Unknown plugin "nope"/);
+    const config = await import("../src/config");
+    expect(config.loadSettings().syncIntervalMinutes).toBe(0);
+    for (const [v, want] of [[2, 5], [45, 45], [-1, 0], ["30", 0]] as const) {
+      fs.writeFileSync(settingsPath, JSON.stringify({ plugins: ["f3"], syncIntervalMinutes: v }));
+      expect(config.loadSettings().syncIntervalMinutes).toBe(want);
+    }
     fs.writeFileSync(settingsPath, JSON.stringify({ plugins: ["f3"] }));
   });
 

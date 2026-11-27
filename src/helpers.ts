@@ -82,6 +82,14 @@ export function coverageNote(bandNos: number[]) {
   return bandNos.map((b) => {
     const rows = store.coverage(b);
     if (!rows.length) return `${bandName(b)}: nothing synced yet — run sync`;
-    return `${bandName(b)}: ` + rows.map((r) => `${r.source} ${r.range_start.slice(0, 10)}→${r.range_end.slice(0, 10)}${r.complete ? "" : ` (partial: ${r.note})`}`).join("; ");
+    // Each sync adds a range; merge overlapping complete ranges per source so the note stays short.
+    const merged: { source: string; start: string; end: string; partial?: string }[] = [];
+    for (const r of [...rows].sort((x, y) => `${x.source}${x.range_start}`.localeCompare(`${y.source}${y.range_start}`))) {
+      const start = r.range_start.slice(0, 10), end = r.range_end.slice(0, 10);
+      const last = merged[merged.length - 1];
+      if (r.complete && last && !last.partial && last.source === r.source && start <= last.end) { if (end > last.end) last.end = end; continue; }
+      merged.push({ source: r.source, start, end, partial: r.complete ? undefined : String(r.note ?? "incomplete") });
+    }
+    return `${bandName(b)}: ` + merged.map((m) => `${m.source} ${m.start}→${m.end}${m.partial ? ` (partial: ${m.partial})` : ""}`).join("; ");
   });
 }

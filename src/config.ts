@@ -33,8 +33,10 @@ export const CHROME_PATHS = [
 ].filter((p): p is string => !!p);
 
 export interface Settings {
-  /** Bands kept current by background sync (serve mode). Empty by default. */
+  /** Default bands for tools that need one, and the bands background sync reads. Empty by default. */
   backgroundBands: number[];
+  /** Minutes between background syncs while `serve` runs; 0 (the default) turns it off. At least 5. */
+  syncIntervalMinutes: number;
   /** Short names, e.g. { myregion: 12345 }. Band names also resolve by partial match. */
   aliases: Record<string, number>;
   allowDestructive: boolean;
@@ -42,7 +44,7 @@ export interface Settings {
   plugins: string[];
 }
 
-const DEFAULT_SETTINGS: Settings = { backgroundBands: [], aliases: {}, allowDestructive: false, plugins: [] };
+const DEFAULT_SETTINGS: Settings = { backgroundBands: [], syncIntervalMinutes: 0, aliases: {}, allowDestructive: false, plugins: [] };
 
 export function ensureDataDir() {
   // Owner-only on macOS and Linux (it holds the BAND session). On Windows the folder under
@@ -60,6 +62,7 @@ export function loadSettings(): Settings {
     const aliases = s.aliases && typeof s.aliases === "object" && !Array.isArray(s.aliases) ? s.aliases : {};
     return {
       backgroundBands: ints(s.backgroundBands),
+      syncIntervalMinutes: Number.isFinite(s.syncIntervalMinutes) && s.syncIntervalMinutes > 0 ? Math.max(5, Math.round(s.syncIntervalMinutes)) : 0,
       aliases: Object.fromEntries(Object.entries(aliases).filter(([, v]) => Number.isInteger(v)).map(([k, v]) => [k.toLowerCase(), v as number])),
       allowDestructive: s.allowDestructive === true,
       plugins: Array.isArray(s.plugins) ? s.plugins.filter((x: unknown): x is string => typeof x === "string") : [],

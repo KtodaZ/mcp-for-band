@@ -49,6 +49,8 @@ For notes about your own setup that coding agents should know, such as your test
 
 ## Layout
 
+[docs/how-it-works.md](docs/how-it-works.md) explains how the pieces fit together.
+
 - `src/band.ts`: requests through BAND's web client in the page.
 - `src/chrome.ts`: starts the server's Chrome and handles sign-in.
 - `src/sync.ts` and `src/store.ts`: the SQLite cache.

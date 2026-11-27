@@ -78,7 +78,7 @@ export const TOOLS: Tool[] = [
     name: "status",
     description: "BAND MCP status: whether the BAND session is signed in, which bands are cached, what's synced (coverage) and recent writes.",
     inputSchema: { type: "object", properties: {} },
-    run: async () => ({ ...(await signedIn()), bands: store.listBands().length, backgroundBands: loadSettings().backgroundBands, plugins: enabledPlugins().map((p) => p.name), coverage: coverageNote(store.listBands().map((b) => b.band_no).filter((b) => store.coverage(b).length)), recentWrites: writes.list(5) }),
+    run: async () => ({ ...(await signedIn()), bands: store.listBands().length, backgroundBands: loadSettings().backgroundBands, syncIntervalMinutes: loadSettings().syncIntervalMinutes, plugins: enabledPlugins().map((p) => p.name), coverage: coverageNote(store.listBands().map((b) => b.band_no).filter((b) => store.coverage(b).length)), recentWrites: writes.list(5) }),
   },
   {
     name: "sign_in",

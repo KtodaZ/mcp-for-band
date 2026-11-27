@@ -1,5 +1,5 @@
 // This module runs the band-mcp CLI commands:
-//   serve            Starts the HTTP server on 127.0.0.1, or Tailscale with BAND_MCP_TAILSCALE=1, and syncs configured bands.
+//   serve            Starts the HTTP server on 127.0.0.1, plus Tailscale with BAND_MCP_TAILSCALE=1, and runs background sync if settings.json turns it on.
 //   stdio            Starts the server over stdio for Claude Code on this computer.
 //   signin           Shows the server's Chrome on band.us so you can sign in, then hides it.
 //   status           Reports sign-in state, cached bands, and cache coverage.
@@ -28,6 +28,20 @@ async function backgroundSync() {
   }
 }
 
+/**
+ * Background sync, off unless settings.json sets syncIntervalMinutes. Settings are read again
+ * before each run, so turning it on, off or changing the interval needs no restart (it applies
+ * within a minute when it was off).
+ */
+function scheduleSync(first = false) {
+  const minutes = loadSettings().syncIntervalMinutes;
+  const delay = minutes > 0 ? (first ? 30_000 : minutes * 60_000) : 60_000;
+  setTimeout(async () => {
+    if (loadSettings().syncIntervalMinutes > 0) await backgroundSync();
+    scheduleSync();
+  }, delay);
+}
+
 if (cmd === "serve" || cmd === "stdio") registerExecutors();
 
 if (cmd === "serve") {
@@ -38,10 +52,7 @@ if (cmd === "serve") {
     s.once("error", () => { for (const o of servers) o.close(); process.exit(1); });
   })));
   console.error(`[band-mcp] listening on ${hosts.join(", ")}`);
-  if (!process.argv.includes("--no-sync")) {
-    setTimeout(() => void backgroundSync(), 30_000);
-    setInterval(() => void backgroundSync(), 30 * 60_000);
-  }
+  if (!process.argv.includes("--no-sync")) scheduleSync(true);
 } else if (cmd === "stdio") {
   serveStdio();
 } else if (cmd === "signin") {

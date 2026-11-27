@@ -14,7 +14,9 @@ The server does not send chat messages, attach files on edits, or delete replies
 
 ## How it works
 
-The server starts off-screen Chrome with its own profile and a DevTools port on `127.0.0.1`. Sign in to BAND there once. Requests run through BAND's web client in the page, so BAND signs them as it would for you. The server queues requests one at a time, at least 300 milliseconds apart. See [docs/band-web-api.md](docs/band-web-api.md).
+The server starts off-screen Chrome with its own profile and a DevTools port on `127.0.0.1`. Sign in to BAND there once. Requests run through BAND's web client in the page, so BAND signs them as it would for you. The server queues requests one at a time, at least 300 milliseconds apart. Reads search a local cache that `sync` fills, and writes wait in a journal until you approve them.
+
+[docs/how-it-works.md](docs/how-it-works.md) explains the whole server: Chrome and sign-in, sync and the cache, approvals, transports and the data folder. [docs/band-web-api.md](docs/band-web-api.md) lists the BAND endpoints it uses.
 
 All data stays on your computer in the data folder: the browser profile, cache, write journal, and tokens. It lives at `%LOCALAPPDATA%\band-mcp` on Windows, `~/.local/share/band-mcp` elsewhere, or `BAND_MCP_DIR`.
 
@@ -55,10 +57,11 @@ See [CONTRIBUTING.md](CONTRIBUTING.md).
 Edit `settings.json` in the data folder:
 
 ```json
-{ "backgroundBands": [12345678], "aliases": { "myregion": 12345678 }, "plugins": ["f3"], "allowDestructive": false }
+{ "backgroundBands": [12345678], "syncIntervalMinutes": 0, "aliases": { "myregion": 12345678 }, "plugins": ["f3"], "allowDestructive": false }
 ```
 
-- `backgroundBands` lists bands that `serve` syncs every 30 minutes for the last 14 days. Plugin tools such as workout stats default to them.
+- `backgroundBands` lists your main bands. Plugin tools such as workout stats default to them.
+- `syncIntervalMinutes` turns on background sync: while `serve` runs, it re-syncs `backgroundBands` for the last 14 days every this many minutes (at least 5). It's `0`, off, by default, and changes apply without a restart. You rarely need it, since the model runs `sync` when a question needs fresh data, and it reads BAND on a schedule even when nobody is asking.
 - `plugins` lists optional tool sets to turn on; see [docs/plugins.md](docs/plugins.md). None are on by default.
 - `aliases` sets short names for bands. Lookups also match partial band names.
 - `allowDestructive` enables deletes when `true`, as does `BAND_MCP_ALLOW_DESTRUCTIVE=1`.
