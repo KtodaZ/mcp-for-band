@@ -125,6 +125,18 @@ describe("writes", () => {
     expect(res.status).toBe("rejected");
   });
 
+  it("approves a batch with one prompt and runs each write", async () => {
+    let prompts = 0;
+    const ids = [];
+    for (const t of ["One", "Two", "Three"]) ids.push(((await tools.callTool("prepare_post", { band: BAND, text: t }, ctx)) as any).write_id);
+    const waiting: any = await tools.callTool("confirm_write", { write_ids: ids }, ctx);
+    expect(waiting.previews).toHaveLength(3);
+    const res: any = await tools.callTool("confirm_write", { write_ids: ids }, { ...ctx, elicit: async (m: string) => { prompts++; expect(m).toContain("3 BAND writes"); return "accept"; } });
+    expect(prompts).toBe(1);
+    expect(res.results.map((r: any) => r.write_id)).toEqual(ids);
+    expect(ids.every((id) => writes.get(id)!.approved_via === "elicitation")).toBe(true);
+  });
+
   it("asks through elicitation and treats decline as rejected", async () => {
     const prep: any = await tools.callTool("prepare_post", { band: BAND, text: "Hi" }, ctx);
     const res: any = await tools.callTool("confirm_write", { write_id: prep.write_id }, { ...ctx, elicit: async () => "decline" });

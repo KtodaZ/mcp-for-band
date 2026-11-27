@@ -7,7 +7,7 @@ mcp-for-band is an unofficial [MCP](https://modelcontextprotocol.io) server for 
 ## What it does
 
 - **Local cache reads.** The server syncs posts, comments, events, event comments, and members into SQLite and searches across bands with `sync`, `search`, `list_posts`, `get_item`, `get_notices`, `find_member`, and `get_media`.
-- **Approved writes.** Create posts, comments, replies, mentions, photos, videos, post edits, notices, and, when enabled, deletes. A `prepare_*` tool returns a preview, and the server sends nothing to BAND until you approve it, either in your client's prompt or by saying yes in chat. The server binds each approval to the text, target, and each file's SHA-256.
+- **Approved writes.** Create posts, comments, replies, mentions, photos, videos, post edits, notices, and, when enabled, deletes. A `prepare_*` tool returns a preview, and the server sends nothing to BAND until you approve it, either in your client's prompt or by saying yes in chat. For bulk posts or comments, one yes approves the whole batch, up to 50. The server binds each approval to the text, target, and each file's SHA-256.
 - **Optional plugins.** Turn on band-specific tool sets in `settings.json`. The `f3` plugin adds `list_workouts`, `workout_stats`, and `who_qd` to parse Q, PAX count, and attendees from backblasts with heuristics and leaves unknown counts unknown. One folder adds a plugin; see [docs/plugins.md](docs/plugins.md).
 
 The server does not send chat messages, attach files on edits, or delete replies.
