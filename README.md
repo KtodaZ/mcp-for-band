@@ -8,7 +8,7 @@ mcp-for-band is an unofficial [MCP](https://modelcontextprotocol.io) server for 
 
 - **Local cache reads.** The server syncs posts, comments, events, event comments, and members into SQLite and searches across bands with `sync`, `search`, `list_posts`, `get_item`, `get_notices`, `find_member`, and `get_media`.
 - **Approved writes.** Create posts, comments, replies, mentions, photos, videos, post edits, notices, and, when enabled, deletes. A `prepare_*` tool returns a preview, and the server sends nothing to BAND until you approve it, either in your client's prompt or by saying yes in chat. For bulk posts or comments, one yes approves the whole batch, up to 50. The server binds each approval to the text, target, and each file's SHA-256.
-- **Optional plugins.** Turn on band-specific tool sets in `settings.json`. The `f3` plugin adds `list_workouts`, `workout_stats`, and `who_qd` to parse Q, PAX count, and attendees from backblasts with heuristics and leaves unknown counts unknown. One folder adds a plugin; see [docs/plugins.md](docs/plugins.md).
+- **Optional plugins.** Turn on extra tool sets for a kind of band in `settings.json`. Each plugin is one folder; see [docs/plugins.md](docs/plugins.md) for the list and how to write one.
 
 The server does not send chat messages, attach files on edits, or delete replies.
 
@@ -79,17 +79,17 @@ See [CONTRIBUTING.md](CONTRIBUTING.md).
 Edit `settings.json` in the data folder:
 
 ```json
-{ "backgroundBands": [12345678], "syncIntervalMinutes": 0, "aliases": { "myregion": 12345678 }, "plugins": ["f3"], "allowDestructive": false }
+{ "backgroundBands": [12345678], "syncIntervalMinutes": 0, "aliases": { "club": 12345678 }, "plugins": [], "allowDestructive": false }
 ```
 
-- `backgroundBands` lists your main bands. Plugin tools such as workout stats default to them.
+- `backgroundBands` lists your main bands. Plugin tools default to them.
 - `syncIntervalMinutes` turns on background sync: while `serve` runs, it re-syncs `backgroundBands` for the last 14 days every this many minutes (5 to 10080, a week). It's `0`, off, by default, and changes apply without a restart. You rarely need it, since the model runs `sync` when a question needs fresh data, and it reads BAND on a schedule even when nobody is asking.
 - `plugins` lists optional tool sets to turn on; see [docs/plugins.md](docs/plugins.md). None are on by default.
 - `aliases` sets short names for bands. Lookups also match partial band names.
 - `allowDestructive` enables deletes when `true`, as does `BAND_MCP_ALLOW_DESTRUCTIVE=1`.
 - `window` is `"minimized"` (the default) or `"visible"` for the server's Chrome window. `BAND_MCP_WINDOW` overrides it.
 
-Other environment variables set paths and defaults: `BAND_MCP_CHROME` sets Chrome's path, `BAND_MCP_CDP_PORT` defaults to 9333, `BAND_MCP_PORT` defaults to 47811, and `BAND_MCP_TZ` sets the workout time zone or uses this machine's.
+Other environment variables set paths and defaults: `BAND_MCP_CHROME` sets Chrome's path, `BAND_MCP_CDP_PORT` defaults to 9333, `BAND_MCP_PORT` defaults to 47811, and `BAND_MCP_TZ` sets the time zone for dates or uses this machine's.
 
 ## Safety
 
