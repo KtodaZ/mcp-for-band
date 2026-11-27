@@ -37,7 +37,7 @@ export async function ensureSession(page?: Page): Promise<Page> {
     lastRenewal = Date.now();
   }
   if (/auth\.band\.us\/(?!refresh)|\/login\b/.test(p.url())) {
-    throw new BandError("auth", "BAND sign-in needed. Run `band-mcp signin` (or ask Claude to sign the BAND MCP in).");
+    throw new BandError("auth", "BAND sign-in needed. Call the sign_in tool, which opens BAND's sign-in window for the user.");
   }
   return p;
 }
@@ -101,7 +101,7 @@ export async function capture(url: string, match: RegExp, opts: { settleMs?: num
   } finally {
     page.off("response", onResponse);
   }
-  if (/auth\.band\.us|\/login\b/.test(page.url())) throw new BandError("auth", "BAND sign-in needed");
+  if (/auth\.band\.us|\/login\b/.test(page.url())) throw new BandError("auth", "BAND sign-in needed. Call the sign_in tool.");
   for (const c of caps) checkResult(c);
   return caps;
 }
@@ -109,7 +109,7 @@ export async function capture(url: string, match: RegExp, opts: { settleMs?: num
 function checkResult(c: Captured) {
   const code = c.json?.result_code;
   if (c.status === 429 || code === 1003) throw new BandError("rate_limited", "BAND is rate limiting requests; stopped.");
-  if (code === 2 || code === 401 || c.status === 401) throw new BandError("auth", "BAND rejected the session");
+  if (code === 2 || code === 401 || c.status === 401) throw new BandError("auth", "BAND rejected the session. Call the sign_in tool.");
 }
 
 // BAND's webpack bundle has an API client class (module 283 today) whose send() adds the akey and

@@ -5,12 +5,13 @@
   "license": "MIT",
   "type": "module",
   "bin": { "band-mcp": "bin/band-mcp.mjs" },
-  "files": ["bin", "src", "docs", "README.md", "LICENSE"],
+  "files": ["bin", "src", "docs", "README.md", "LICENSE", "manifest.json"],
   "engines": { "node": ">=24" },
   "scripts": {
     "start": "tsx src/main.ts serve",
     "typecheck": "tsc -p tsconfig.json",
-    "test": "vitest run"
+    "test": "vitest run",
+    "pack:mcpb": "node scripts/pack-mcpb.mjs"
   },
   "dependencies": {
     "playwright-core": "1.63.0",

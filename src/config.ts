@@ -15,7 +15,7 @@ export const CDP_PORT = Number(process.env.BAND_MCP_CDP_PORT ?? 9333);
 export const HTTP_PORT = Number(process.env.BAND_MCP_PORT ?? 47811);
 
 /** Time zone for workout dates and notice times. Defaults to this machine's. */
-export const TIME_ZONE = process.env.BAND_MCP_TZ ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
+export const TIME_ZONE = process.env.BAND_MCP_TZ || Intl.DateTimeFormat().resolvedOptions().timeZone;
 
 export const CHROME_PATHS = [
   process.env.BAND_MCP_CHROME,

@@ -68,3 +68,32 @@ export async function disconnect() {
   try { await browser?.close(); } catch { /* gone */ }
   browser = null;
 }
+
+/**
+ * Show the MCP's Chrome window on BAND's home page and wait for the user to sign in, then hide it
+ * again. The user types their own credentials in BAND's page; nothing here reads or stores them.
+ */
+export async function signIn(timeoutMs = 10 * 60_000): Promise<boolean> {
+  const page = await (await context()).newPage();
+  const cdp = await page.context().newCDPSession(page);
+  const { windowId } = (await cdp.send("Browser.getWindowForTarget")) as { windowId: number };
+  const place = (left: number) => cdp.send("Browser.setWindowBounds", { windowId, bounds: { left, top: 80, width: 1100, height: 850 } });
+  const signedIn = async () => /^https:\/\/www\.band\.us\/(home|band|discover|feed)/.test(page.url()) && !(await page.$("a[href*='login'], .loginBtn").catch(() => null));
+  try {
+    await cdp.send("Browser.setWindowBounds", { windowId, bounds: { windowState: "normal" } });
+    await page.goto("https://www.band.us/home");
+    await page.waitForTimeout(1500);
+    if (await signedIn()) return true;
+    await place(200);
+    await page.bringToFront();
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      await page.waitForTimeout(2000);
+      if (await signedIn()) return true;
+    }
+    return false;
+  } finally {
+    await place(-2400).catch(() => undefined);
+    await page.close().catch(() => undefined);
+  }
+}

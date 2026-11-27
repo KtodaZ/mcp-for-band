@@ -70,7 +70,7 @@ export async function upload(pageUrl: string, items: Attachment[]): Promise<Uplo
 
 async function uploadOne(page: Page, pageUrl: string, a: Attachment, title: string): Promise<Uploaded> {
   await page.goto(pageUrl, { waitUntil: "domcontentloaded", timeout: 30_000 });
-  if (/auth\.band\.us|\/login\b/.test(page.url())) throw new BandError("auth", "BAND sign-in needed");
+  if (/auth\.band\.us|\/login\b/.test(page.url())) throw new BandError("auth", "BAND sign-in needed. Call the sign_in tool.");
   await page.waitForSelector("input._mediaUploadInput", { state: "attached", timeout: 20_000 })
     .catch(() => { throw new BandError("unsupported", "No comment box on that BAND page to upload through"); });
   // Allow about 200 KB/s, and at least two minutes.

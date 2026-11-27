@@ -20,22 +20,35 @@ All data stays on your computer in the data folder: the browser profile, cache, 
 
 ## Setup
 
-This server needs Node 24 or later and Google Chrome.
+You need Google Chrome.
+
+### Claude Desktop (easiest)
+
+1. Download `mcp-for-band.mcpb` from the [latest release](https://github.com/KtodaZ/mcp-for-band/releases/latest).
+2. Double-click it, or drag it into Claude Desktop's Settings > Extensions, and click Install.
+3. Ask Claude "sign me in to BAND". A Chrome window opens on BAND's page. Sign in there, and the window hides again.
+
+### Claude Code
+
+You need Node 24 or later. Run:
+
+```sh
+claude mcp add band -- npx -y mcp-for-band stdio
+```
+
+Then ask Claude "sign me in to BAND".
+
+### Using it
+
+Ask things like "sync my bands for the last two weeks", "who Q'd in November?", or "draft a comment on Saturday's event with this photo". Claude shows you each draft, and nothing goes to BAND until you approve it.
+
+### From source
 
 ```sh
 git clone https://github.com/KtodaZ/mcp-for-band && cd mcp-for-band
 npm install
-node bin/band-mcp.mjs signin    # sign in to BAND in the window that opens
-node bin/band-mcp.mjs status
+claude mcp add band -- node "$PWD/bin/band-mcp.mjs" stdio
 ```
-
-Add the server to Claude Code over stdio:
-
-```sh
-claude mcp add band -- node /path/to/mcp-for-band/bin/band-mcp.mjs stdio
-```
-
-Over stdio, Claude Code asks you to approve each write. You can then ask "sync my bands for the last two weeks", "who Q'd in November?", or "draft a comment on Saturday's event with this photo".
 
 ### Optional HTTP mode
 
@@ -67,6 +80,7 @@ Other environment variables set paths and defaults: `BAND_MCP_CHROME` sets Chrom
 ```sh
 npm test
 npm run typecheck
+npm run pack:mcpb   # builds dist/mcp-for-band.mcpb for Claude Desktop
 ```
 
 `scripts/` has helpers for mapping endpoints. Test writes only on a private band where only you are a member: `BAND_MCP_TEST_BAND=<band_no> npx tsx scripts/try-write.ts post '{...}'`.

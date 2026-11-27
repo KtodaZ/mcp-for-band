@@ -6,7 +6,7 @@ import * as sync from "./sync";
 import * as writes from "./writes";
 import * as media from "./media";
 import { BandError, signedIn } from "./band";
-import { context } from "./chrome";
+import { context, signIn } from "./chrome";
 import { loadSettings, MEDIA_DIR } from "./config";
 import { type Tool, type ToolContext, UNTRUSTED, band, bands, date, resolveBand, resolveBands, bandName, day, dayEnd, today, daysAgo, coverageNote } from "./helpers";
 import { enabledPlugins } from "./plugins";
@@ -75,6 +75,14 @@ export const TOOLS: Tool[] = [
     description: "BAND MCP status: whether the BAND session is signed in, which bands are cached, what's synced (coverage) and recent writes.",
     inputSchema: { type: "object", properties: {} },
     run: async () => ({ ...(await signedIn()), bands: store.listBands().length, backgroundBands: loadSettings().backgroundBands, plugins: enabledPlugins().map((p) => p.name), coverage: coverageNote(store.listBands().map((b) => b.band_no).filter((b) => store.coverage(b).length)), recentWrites: writes.list(5) }),
+  },
+  {
+    name: "sign_in",
+    description: "Open the BAND sign-in window and wait up to 10 minutes for the user to sign in there. Use it when BAND needs sign-in or the user asks to sign in. The user types their own credentials in BAND's page; never ask for them in chat.",
+    inputSchema: { type: "object", properties: {} },
+    run: async () => (await signIn())
+      ? { signed_in: true, next: "Run list_bands with refresh: true, then sync." }
+      : { signed_in: false, next: "No sign-in seen in 10 minutes. Ask the user if they want to try again." },
   },
   {
     name: "list_bands",

@@ -9,7 +9,7 @@ import { loadSecrets, saveSecrets, loadSettings, ensureDataDir } from "./config"
 import { syncPosts, syncEvents } from "./sync";
 import { callTool } from "./tools";
 import { localDate } from "./helpers";
-import { context, disconnect } from "./chrome";
+import { context, disconnect, signIn } from "./chrome";
 import { registerExecutors } from "./executors";
 
 const [cmd, arg] = process.argv.slice(2);
@@ -40,24 +40,8 @@ if (cmd === "serve") {
 } else if (cmd === "stdio") {
   serveStdio();
 } else if (cmd === "signin") {
-  // You type your own credentials in BAND's page; nothing here reads or stores them.
-  const page = await (await context()).newPage();
-  const cdp = await page.context().newCDPSession(page);
-  const { windowId } = (await cdp.send("Browser.getWindowForTarget")) as { windowId: number };
-  const place = (left: number) => cdp.send("Browser.setWindowBounds", { windowId, bounds: { left, top: 80, width: 1100, height: 850 } });
-  await cdp.send("Browser.setWindowBounds", { windowId, bounds: { windowState: "normal" } });
-  await place(200);
-  await page.goto("https://www.band.us/home");
-  await page.bringToFront();
   console.log("Sign in to BAND in the Chrome window that just opened. Waiting up to 10 minutes...");
-  const deadline = Date.now() + 10 * 60_000;
-  let ok = false;
-  while (!ok && Date.now() < deadline) {
-    await page.waitForTimeout(2000);
-    ok = /^https:\/\/www\.band\.us\/(home|band|discover|feed)/.test(page.url()) && !(await page.$("a[href*='login'], .loginBtn").catch(() => null));
-  }
-  await place(-2400);
-  await page.close();
+  const ok = await signIn();
   console.log(ok ? "Signed in. The MCP's Chrome keeps the session." : "Didn't see a sign-in; run signin again.");
   await disconnect();
   process.exit(ok ? 0 : 1);
