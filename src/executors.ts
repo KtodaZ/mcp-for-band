@@ -56,12 +56,15 @@ export function withMentions(text: string, mentions: WritePayload["mentions"] = 
 
 const contentKey = (o: object) => JSON.stringify(o);
 
-async function livePost(bandNo: number, postNo: number) {
+export async function livePost(bandNo: number, postNo: number) {
   const json = await call("v2.0.0/get_post", { band_no: bandNo, post_no: postNo, resolution_type: 4 });
   const post = json.result_data?.post;
   if (!post) throw new BandError("shape", "BAND returned no post");
   return post as Record<string, any>;
 }
+
+/** Hash of a post's text as BAND holds it now. The feed copy in the cache drops blank lines, so never hash that. */
+export const postVersion = (content: unknown) => crypto.createHash("sha256").update(String(content ?? "")).digest("hex");
 
 function cacheFrom(json: unknown, bandNo: number) {
   const posts = extractPosts(json, bandNo);
@@ -87,7 +90,7 @@ export function registerExecutors() {
     sameBand(t, p);
     const post = await livePost(t.bandNo, t.postNo);
     // Re-check against BAND itself, not just the cache: refuse if anyone changed it since the preview.
-    if (row.target_version && crypto.createHash("sha256").update(String(post.content ?? "")).digest("hex") !== row.target_version) {
+    if (row.target_version && postVersion(post.content) !== row.target_version) {
       throw new BandError("unsupported", "The post changed on BAND since the preview; prepare the edit again");
     }
     // The edit request resends attachments; until that's mapped, don't risk dropping them.
@@ -149,7 +152,7 @@ export function registerExecutors() {
     // Delete only the post the user saw: refuse if it changed on BAND since the preview.
     if (row.target_version) {
       const post = await livePost(t.bandNo, t.postNo);
-      if (crypto.createHash("sha256").update(String(post.content ?? "")).digest("hex") !== row.target_version) {
+      if (postVersion(post.content) !== row.target_version) {
         throw new BandError("unsupported", "The post changed on BAND since the preview; prepare the delete again");
       }
     }

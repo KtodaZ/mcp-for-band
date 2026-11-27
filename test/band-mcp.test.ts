@@ -2,7 +2,14 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
+
+// Edits and deletes read the post live from BAND. Here "BAND" is the test cache.
+vi.mock("../src/executors", async (orig) => {
+  const actual = await orig<typeof import("../src/executors")>();
+  const store = await import("../src/store");
+  return { ...actual, livePost: async (bandNo: number, postNo: number) => ({ content: store.getItem(`post:${bandNo}:${postNo}`)?.body ?? "" }) };
+});
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "band-mcp-"));
 process.env.BAND_MCP_DIR = dir;
@@ -138,6 +145,10 @@ describe("writes", () => {
     const prep2: any = await tools.callTool("prepare_post", { band: BAND, text: "Client no" }, ctx);
     const res: any = await tools.callTool("confirm_write", { write_id: prep2.write_id, user_approved: true }, { ...ctx, elicit: async () => "decline" });
     expect(res.status).toBe("rejected");
+    // A client that cancels its approval box without showing it doesn't block a yes in chat.
+    const prep3: any = await tools.callTool("prepare_post", { band: BAND, text: "Box unseen" }, ctx);
+    await tools.callTool("confirm_write", { write_id: prep3.write_id, user_approved: true }, { ...ctx, elicit: async () => "cancel" });
+    expect(writes.get(prep3.write_id)!.approved_via).toBe("chat");
   });
 
   it("approves a batch with one prompt and runs each write", async () => {

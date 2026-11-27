@@ -10,6 +10,14 @@ import { context, signIn } from "./chrome";
 import { loadSettings, MEDIA_DIR } from "./config";
 import { type Tool, type ToolContext, UNTRUSTED, band, bands, date, resolveBand, resolveBands, bandName, day, dayEnd, today, daysAgo, coverageNote } from "./helpers";
 import { enabledPlugins } from "./plugins";
+import { livePost, parseTarget, postVersion } from "./executors";
+
+/** A post's text as BAND holds it now. The cached feed copy drops blank lines, so edits and deletes read this. */
+async function liveText(id: string): Promise<string> {
+  const t = parseTarget(id);
+  if (t.kind !== "post") throw new BandError("unsupported", `Not a post: ${id}`);
+  return String((await livePost(t.bandNo, t.postNo)).content ?? "");
+}
 export { resolveBand, type ToolContext } from "./helpers";
 
 function shortItem(r: Record<string, any>) {
@@ -209,8 +217,10 @@ export const TOOLS: Tool[] = [
       const it = store.getItem(a.id);
       if (!it || it.kind !== "post") throw new BandError("unsupported", `Not a cached post: ${a.id}`);
       const p: writes.WritePayload = { bandNo: it.band_no, target: a.id, text: a.text, mentions: resolveMentions(it.band_no, a.tags) };
-      const version = crypto.createHash("sha256").update(it.body).digest("hex");
-      return prepared(writes.prepare("edit_post", p, previewText("edit_post", it.band_no, p, [`Current text:\n${store.stripMarkup(it.body)}`]), version, { body: it.body }), ctx);
+      // Read the post from BAND: the feed copy in the cache drops blank lines, so the user should see
+      // and edit the real text.
+      const live = await liveText(a.id);
+      return prepared(writes.prepare("edit_post", p, previewText("edit_post", it.band_no, p, [`Current text:\n${store.stripMarkup(live)}`]), postVersion(live), { body: live }), ctx);
     },
   },
   {
@@ -272,8 +282,9 @@ export const TOOLS: Tool[] = [
       if (a.id.split(":").length > 4) throw new BandError("unsupported", "Deleting a reply isn't supported yet. Delete it in BAND");
       const action = it.kind === "post" ? "delete_post" : "delete_comment";
       const p: writes.WritePayload = { bandNo: it.band_no, target: a.id };
-      const version = action === "delete_post" ? crypto.createHash("sha256").update(it.body).digest("hex") : null;
-      return prepared(writes.prepare(action, p, previewText(action, it.band_no, p, ["THIS PERMANENTLY DELETES IT FROM BAND.", `Text:\n${store.stripMarkup(it.body)}`]), version, it), ctx);
+      const live = action === "delete_post" ? await liveText(a.id) : null;
+      const version = live === null ? null : postVersion(live);
+      return prepared(writes.prepare(action, p, previewText(action, it.band_no, p, ["THIS PERMANENTLY DELETES IT FROM BAND.", `Text:\n${store.stripMarkup(live ?? it.body)}`]), version, it), ctx);
     },
   },
   {
@@ -311,10 +322,7 @@ export const TOOLS: Tool[] = [
       for (const row of rows) {
         if (row.status !== "approved") { results.push({ write_id: row.id, status: row.status, result: row.result ? JSON.parse(row.result) : undefined }); continue; }
         try {
-          const done = await writes.execute(row.id, row.target_version ? async () => {
-            const it = store.getItem(JSON.parse(row.payload).target);
-            return it ? crypto.createHash("sha256").update(it.body).digest("hex") : null;
-          } : undefined);
+          const done = await writes.execute(row.id, row.target_version ? async () => postVersion(await liveText(JSON.parse(row.payload).target)) : undefined);
           results.push({ write_id: row.id, status: done.status, result: done.result ? JSON.parse(done.result) : undefined });
         } catch (e) {
           const after = writes.get(row.id)!;
