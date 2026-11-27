@@ -2,20 +2,35 @@
   "manifest_version": "0.3",
   "name": "mcp-for-band",
   "display_name": "BAND (unofficial)",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Search your BAND groups and post as yourself, with your approval for every write.",
   "long_description": "Unofficial and not affiliated with BAND or NAVER. Runs on your computer with its own Chrome window: you sign in to BAND once, then Claude can sync and search your bands, and draft posts and comments that only go out after you approve them. Automated use may go against BAND's terms of service; read them first.",
-  "author": { "name": "KtodaZ" },
-  "repository": { "type": "git", "url": "https://github.com/KtodaZ/mcp-for-band" },
+  "author": {
+    "name": "KtodaZ"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/KtodaZ/mcp-for-band"
+  },
   "license": "MIT",
-  "keywords": ["band", "band.us", "groups", "f3"],
+  "keywords": [
+    "band",
+    "band.us",
+    "groups",
+    "f3"
+  ],
   "server": {
     "type": "node",
     "entry_point": "bin/band-mcp.mjs",
     "mcp_config": {
       "command": "node",
-      "args": ["${__dirname}/bin/band-mcp.mjs", "stdio"],
-      "env": { "BAND_MCP_TZ": "${user_config.time_zone}" }
+      "args": [
+        "${__dirname}/bin/band-mcp.mjs",
+        "stdio"
+      ],
+      "env": {
+        "BAND_MCP_TZ": "${user_config.time_zone}"
+      }
     }
   },
   "user_config": {
@@ -28,26 +43,83 @@
     }
   },
   "tools": [
-    { "name": "sign_in", "description": "Open BAND's sign-in window" },
-    { "name": "status", "description": "Sign-in and cache status" },
-    { "name": "list_bands", "description": "Your bands" },
-    { "name": "sync", "description": "Read a band into the local cache" },
-    { "name": "search", "description": "Search cached posts, comments and events" },
-    { "name": "list_posts", "description": "Recent posts in a band" },
-    { "name": "get_item", "description": "One post, comment or event" },
-    { "name": "get_notices", "description": "A band's notices" },
-    { "name": "find_member", "description": "Find a band member" },
-    { "name": "get_media", "description": "Download a post's photos" },
-    { "name": "prepare_post", "description": "Draft a post" },
-    { "name": "prepare_comment", "description": "Draft a comment or reply" },
-    { "name": "prepare_edit_post", "description": "Draft a post edit" },
-    { "name": "prepare_notice", "description": "Draft a notice change" },
-    { "name": "prepare_delete", "description": "Draft a delete (off unless allowed)" },
-    { "name": "confirm_write", "description": "Send approved drafts to BAND" },
-    { "name": "list_writes", "description": "Recent writes and their status" }
+    {
+      "name": "sign_in",
+      "description": "Open BAND's sign-in window"
+    },
+    {
+      "name": "status",
+      "description": "Sign-in and cache status"
+    },
+    {
+      "name": "list_bands",
+      "description": "Your bands"
+    },
+    {
+      "name": "sync",
+      "description": "Read a band into the local cache"
+    },
+    {
+      "name": "search",
+      "description": "Search cached posts, comments and events"
+    },
+    {
+      "name": "list_posts",
+      "description": "Recent posts in a band"
+    },
+    {
+      "name": "get_item",
+      "description": "One post, comment or event"
+    },
+    {
+      "name": "get_notices",
+      "description": "A band's notices"
+    },
+    {
+      "name": "find_member",
+      "description": "Find a band member"
+    },
+    {
+      "name": "get_media",
+      "description": "Download a post's photos"
+    },
+    {
+      "name": "prepare_post",
+      "description": "Draft a post"
+    },
+    {
+      "name": "prepare_comment",
+      "description": "Draft a comment or reply"
+    },
+    {
+      "name": "prepare_edit_post",
+      "description": "Draft a post edit"
+    },
+    {
+      "name": "prepare_notice",
+      "description": "Draft a notice change"
+    },
+    {
+      "name": "prepare_delete",
+      "description": "Draft a delete (off unless allowed)"
+    },
+    {
+      "name": "confirm_write",
+      "description": "Send approved drafts to BAND"
+    },
+    {
+      "name": "list_writes",
+      "description": "Recent writes and their status"
+    }
   ],
   "compatibility": {
-    "platforms": ["darwin", "win32", "linux"],
-    "runtimes": { "node": ">=24.0.0" }
+    "platforms": [
+      "darwin",
+      "win32",
+      "linux"
+    ],
+    "runtimes": {
+      "node": ">=24.0.0"
+    }
   }
 }

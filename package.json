@@ -1,6 +1,6 @@
 {
   "name": "mcp-for-band",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "Unofficial MCP server for BAND (band.us): search, sync and post as yourself through your own signed-in Chrome, with approval for every write",
   "license": "MIT",
