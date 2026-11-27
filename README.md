@@ -12,9 +12,26 @@ mcp-for-band is an unofficial [MCP](https://modelcontextprotocol.io) server for 
 
 The server does not send chat messages, attach files on edits, or delete replies.
 
+## Why this exists
+
+BAND has an [official Open API](https://developers.band.us/develop/guide/api), but it covers very little:
+
+| | Open API | mcp-for-band |
+|---|---|---|
+| Posts | Read, write text, delete | Read, write, edit, delete |
+| Comments | Read, write, delete | Read, write, reply, delete |
+| Events and their comments | No | Yes |
+| Photos and videos in posts and comments | No (albums and photos are read-only) | Yes |
+| Mentions | No | Yes |
+| Notices | No | Read, add, remove |
+| Members | No | Yes |
+| Search across bands | No | Yes, from the local cache |
+
+The Open API also needs an app registered with BAND and approved. The author applied and never heard back. mcp-for-band works with what you can already do in BAND's web app, as you, with nothing to apply for.
+
 ## How it works
 
-The server starts off-screen Chrome with its own profile and a DevTools port on `127.0.0.1`. Sign in to BAND there once. Requests run through BAND's web client in the page, so BAND signs them as it would for you. The server queues requests one at a time, at least 300 milliseconds apart. Reads search a local cache that `sync` fills, and writes wait in a journal until you approve them.
+The server starts its own Chrome, minimized, with its own profile and a DevTools port on `127.0.0.1`. Sign in to BAND there once. Requests run through BAND's web client in the page, so BAND signs them as it would for you. The server queues requests one at a time, at least 300 milliseconds apart. Reads search a local cache that `sync` fills, and writes wait in a journal until you approve them.
 
 [docs/how-it-works.md](docs/how-it-works.md) explains the whole server: Chrome and sign-in, sync and the cache, approvals, transports and the data folder. [docs/band-web-api.md](docs/band-web-api.md) lists the BAND endpoints it uses.
 
@@ -28,7 +45,7 @@ You need Google Chrome.
 
 1. Download `mcp-for-band.mcpb` from the [latest release](https://github.com/KtodaZ/mcp-for-band/releases/latest).
 2. Double-click it, or drag it into Claude Desktop's Settings > Extensions, and click Install.
-3. Ask Claude "sign me in to BAND". A Chrome window opens on BAND's page. Sign in there, and the window hides again.
+3. Ask Claude "sign me in to BAND". A Chrome window opens on BAND's page. Sign in there, and the window minimizes again.
 
 ### Claude Code
 
@@ -65,6 +82,7 @@ Edit `settings.json` in the data folder:
 - `plugins` lists optional tool sets to turn on; see [docs/plugins.md](docs/plugins.md). None are on by default.
 - `aliases` sets short names for bands. Lookups also match partial band names.
 - `allowDestructive` enables deletes when `true`, as does `BAND_MCP_ALLOW_DESTRUCTIVE=1`.
+- `window` is `"minimized"` (the default) or `"visible"` for the server's Chrome window. `BAND_MCP_WINDOW` overrides it.
 
 Other environment variables set paths and defaults: `BAND_MCP_CHROME` sets Chrome's path, `BAND_MCP_CDP_PORT` defaults to 9333, `BAND_MCP_PORT` defaults to 47811, and `BAND_MCP_TZ` sets the workout time zone or uses this machine's.
 

@@ -23,7 +23,7 @@ node bin/band-mcp.mjs signin
 node bin/band-mcp.mjs status
 ```
 
-`signin` opens the server's Chrome window on BAND. Sign in there; the window hides again when you're done.
+`signin` opens the server's Chrome window on BAND. Sign in there; the window minimizes again when you're done.
 
 Point Claude Code at your checkout:
 

@@ -11,7 +11,7 @@ flowchart LR
     cache[("cache<br/>band.db")]
     journal[("write journal<br/>band.db")]
   end
-  chrome["Chrome, off-screen<br/>own profile, signed in"]
+  chrome["Chrome, minimized<br/>own profile, signed in"]
   band["BAND<br/>api.band.us"]
   client <--> transport <--> tools
   tools <--> cache
@@ -33,9 +33,9 @@ flowchart LR
 
 ## Chrome and sign-in
 
-The server never sees your BAND password. It starts Google Chrome with its own profile in the data folder and a DevTools port on `127.0.0.1` (9333 by default), placed off-screen. It doesn't run headless, because headless Chrome says so in its user agent. If that Chrome is already running, the server connects to it instead of starting another, so several server processes can share it.
+The server never sees your BAND password. It starts Google Chrome with its own profile in the data folder and a DevTools port on `127.0.0.1` (9333 by default). It's an ordinary Chrome window, minimized so it stays out of your way. You can open it from the taskbar or Dock at any time and watch what it does, or set `"window": "visible"` in `settings.json` to keep it open. Chrome normally slows down minimized windows, so the server starts it with that turned off. It doesn't run headless, because headless Chrome announces itself in its user agent, and hiding that would mean faking it. If that Chrome is already running, the server connects to it instead of starting another, so several server processes can share it. Each process works in its own tab, marked with its process id, and closes the tabs of processes that have died.
 
-The first time, the `sign_in` tool (or `band-mcp signin`) moves the window on-screen at BAND's home page. You sign in like you would anywhere. When BAND shows a signed-in page, the window moves off-screen again. The profile keeps the session, so you sign in once.
+The first time, the `sign_in` tool (or `band-mcp signin`) brings the window to the front at BAND's home page. You sign in like you would anywhere. When BAND shows a signed-in page, the window minimizes again. The profile keeps the session, so you sign in once.
 
 BAND's session cookie lasts about 5 minutes and renews when a BAND page loads. Before calling BAND, the server reloads its tab if the last load was more than 4 minutes ago. If BAND sends the tab to a sign-in page, the call fails with an `auth` error that tells the model to use `sign_in`.
 

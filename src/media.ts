@@ -8,7 +8,7 @@ import fs from "node:fs";
 import path from "node:path";
 import type { Page } from "playwright-core";
 import { BandError } from "./band";
-import { context } from "./chrome";
+import { ownPage } from "./chrome";
 import { DATA_DIR } from "./config";
 
 export type MediaKind = "photo" | "video";
@@ -72,7 +72,7 @@ export async function upload(pageUrl: string, items: Attachment[]): Promise<Uplo
       if ((await sha256File(copy)) !== a.sha256) throw new BandError("unsupported", `${title} changed since it was approved; prepare the write again`);
       copies.push({ a: { ...a, path: copy }, title });
     }
-    page = await (await context()).newPage();
+    page = await ownPage();
     page.on("dialog", (d) => d.dismiss().catch(() => undefined));
     const out: Uploaded[] = [];
     for (const { a, title } of copies) out.push(await uploadOne(page, pageUrl, a, title));

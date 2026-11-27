@@ -42,9 +42,11 @@ export interface Settings {
   allowDestructive: boolean;
   /** Optional tool sets to turn on, by name (src/plugins), e.g. ["f3"]. */
   plugins: string[];
+  /** The server's Chrome window: "minimized" (default) or "visible". BAND_MCP_WINDOW overrides it. */
+  window: "minimized" | "visible";
 }
 
-const DEFAULT_SETTINGS: Settings = { backgroundBands: [], syncIntervalMinutes: 0, aliases: {}, allowDestructive: false, plugins: [] };
+const DEFAULT_SETTINGS: Settings = { backgroundBands: [], syncIntervalMinutes: 0, aliases: {}, allowDestructive: false, plugins: [], window: "minimized" };
 
 export function ensureDataDir() {
   // Owner-only on macOS and Linux (it holds the BAND session). On Windows the folder under
@@ -65,6 +67,7 @@ export function loadSettings(): Settings {
       syncIntervalMinutes: Number.isFinite(s.syncIntervalMinutes) && s.syncIntervalMinutes > 0 ? Math.max(5, Math.round(s.syncIntervalMinutes)) : 0,
       aliases: Object.fromEntries(Object.entries(aliases).filter(([, v]) => Number.isInteger(v)).map(([k, v]) => [k.toLowerCase(), v as number])),
       allowDestructive: s.allowDestructive === true,
+      window: s.window === "visible" ? "visible" : "minimized",
       plugins: Array.isArray(s.plugins) ? s.plugins.filter((x: unknown): x is string => typeof x === "string") : [],
     };
   } catch {
