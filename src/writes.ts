@@ -44,7 +44,9 @@ export interface WriteRow {
   before: string | null;
 }
 
-const TTL_MS = 10 * 60_000;
+// Drafts and approvals don't expire: a yes given later still counts. Edits and deletes are
+// re-checked against BAND right before they run, so a stale draft can't overwrite newer text.
+const NEVER = "9999-12-31T00:00:00.000Z";
 const now = () => new Date().toISOString();
 
 export function hashPayload(action: string, p: WritePayload) {
@@ -62,7 +64,7 @@ export function prepare(action: WriteAction, payload: WritePayload, preview: str
   const id = `w_${crypto.randomBytes(6).toString("hex")}`;
   const row = {
     id, created_at: now(), action, band_no: payload.bandNo, payload: JSON.stringify(payload), payload_hash: hashPayload(action, payload),
-    preview, target_version: targetVersion ?? null, status: "pending" as const, expires_at: new Date(Date.now() + TTL_MS).toISOString(),
+    preview, target_version: targetVersion ?? null, status: "pending" as const, expires_at: NEVER,
     approved_at: null, approved_via: null, result: null, before: before === undefined ? null : JSON.stringify(before),
   };
   open().prepare(`INSERT INTO writes (id, created_at, action, band_no, payload, payload_hash, preview, target_version, status, expires_at, before, updated_at)
@@ -72,14 +74,7 @@ export function prepare(action: WriteAction, payload: WritePayload, preview: str
 }
 
 export function get(id: string): WriteRow | undefined {
-  const row = open().prepare("SELECT * FROM writes WHERE id = ?").get(id) as WriteRow | undefined;
-  if (row && row.status === "pending" && row.expires_at < now()) {
-    // Only a still-pending row expires, so this can't overwrite an approval made meanwhile.
-    const res = open().prepare("UPDATE writes SET status = 'expired', updated_at = ? WHERE id = ? AND status = 'pending' AND expires_at < ?").run(now(), id, now());
-    if (res.changes === 1) event(id, "expired");
-    return open().prepare("SELECT * FROM writes WHERE id = ?").get(id) as WriteRow | undefined;
-  }
-  return row;
+  return open().prepare("SELECT * FROM writes WHERE id = ?").get(id) as WriteRow | undefined;
 }
 
 function setStatus(id: string, status: WriteRow["status"], extra: Partial<Pick<WriteRow, "approved_via" | "result">> = {}) {
@@ -88,14 +83,14 @@ function setStatus(id: string, status: WriteRow["status"], extra: Partial<Pick<W
   event(id, status, extra);
 }
 
-/** Record the user's decision on one write. Only a pending, unexpired write can change. */
+/** Record the user's decision on one write. Only a pending write can change. */
 export function decide(id: string, approve: boolean, via: "elicitation" | "chat"): WriteRow {
   return decideAll([id], approve, via)[0]!;
 }
 
 /**
- * Record one decision for a batch, all or nothing: every write must still be pending and
- * unexpired, or none changes. A rejection leaves approved_at empty.
+ * Record one decision for a batch, all or nothing: every write must still be pending, or none
+ * changes. A rejection leaves approved_at empty.
  */
 export function decideAll(ids: string[], approve: boolean, via: "elicitation" | "chat"): WriteRow[] {
   const d = open();
@@ -106,8 +101,8 @@ export function decideAll(ids: string[], approve: boolean, via: "elicitation" | 
       const row = get(id);
       if (!row) throw new BandError("unsupported", `No write ${id}`);
       if (row.status !== "pending") throw new BandError("unsupported", `Write ${id} is ${row.status}`);
-      const res = d.prepare("UPDATE writes SET status = ?, approved_via = ?, approved_at = ?, updated_at = ? WHERE id = ? AND status = 'pending' AND expires_at >= ?")
-        .run(approve ? "approved" : "rejected", via, approve ? t : null, t, id, t);
+      const res = d.prepare("UPDATE writes SET status = ?, approved_via = ?, approved_at = ?, updated_at = ? WHERE id = ? AND status = 'pending'")
+        .run(approve ? "approved" : "rejected", via, approve ? t : null, t, id);
       if (res.changes !== 1) throw new BandError("unsupported", `Write ${id} changed while deciding`);
       event(id, approve ? "approved" : "rejected", { via });
     }
@@ -118,9 +113,6 @@ export function decideAll(ids: string[], approve: boolean, via: "elicitation" | 
   }
   return ids.map((id) => get(id)!);
 }
-
-/** An approval is good for this long; after that the write must be prepared and approved again. */
-const APPROVAL_TTL_MS = 10 * 60_000;
 
 export type Executor = (row: WriteRow, payload: WritePayload) => Promise<unknown>;
 
@@ -145,7 +137,6 @@ export function execute(id: string, currentVersion?: () => Promise<string | null
       if (r.changes === 1) event(id, status, { result: why });
       throw new BandError("unsupported", why);
     };
-    if (!row.approved_at || Date.parse(row.approved_at) < Date.now() - APPROVAL_TTL_MS) retire("expired", `The approval for ${id} is over 10 minutes old; prepare it again`);
     if (DESTRUCTIVE.includes(row.action) && !destructiveAllowed()) retire("failed", "Deletes were turned off after this was approved");
     const payload = JSON.parse(row.payload) as WritePayload;
     if (hashPayload(row.action, payload) !== row.payload_hash) throw new BandError("unsupported", "Payload changed after approval; prepare it again");

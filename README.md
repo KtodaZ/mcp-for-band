@@ -94,7 +94,7 @@ Other environment variables set paths and defaults: `BAND_MCP_CHROME` sets Chrom
 ## Safety
 
 - Text from BAND is member content. The server instructs the model to treat it as data, not instructions, and only you can approve writes.
-- Write previews expire after 10 minutes. The server refuses an edit if the post changed after the preview.
+- Drafts don't expire. The server refuses an edit or delete if the post changed on BAND after the preview.
 - Keep the data folder private because it holds your BAND session. On macOS and Linux, the server creates it with mode 700.
 
 ## Development

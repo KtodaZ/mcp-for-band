@@ -59,10 +59,9 @@ Read tools never call BAND. They search the SQLite cache, `band.db` in the data 
 
 Every change to BAND takes two steps, and only the user can do the second.
 
-1. **Draft.** A `prepare_*` tool checks the request against the cache and BAND, and writes a draft to the journal (the `writes` table in `band.db`). It returns a plain-text preview: the band, the exact text, the target, each file with its full path and size, and what else happens, such as notifications. The draft stores a hash of the payload and each attached file's SHA-256. Drafts expire after 10 minutes.
+1. **Draft.** A `prepare_*` tool checks the request against the cache and BAND, and writes a draft to the journal (the `writes` table in `band.db`). It returns a plain-text preview: the band, the exact text, the target, each file with its full path and size, and what else happens, such as notifications. The draft stores a hash of the payload and each attached file's SHA-256. Drafts don't expire, so a yes given later still counts.
 2. **Approve.** The model shows you the preview and calls `confirm_write`. If the client supports MCP elicitation, the client asks you directly with an approval box. Otherwise you say yes in chat, and the model passes `user_approved: true`. A batch of up to 50 drafts takes one yes. The server can't hear your yes, so a chat approval trusts the model to ask you first. The approval box doesn't. If your client can ask before each tool call, have it ask for `confirm_write`.
 3. **Send.** The server runs approved writes one at a time. Just before each one, it checks:
-   - the approval is under 10 minutes old;
    - the payload still matches its hash;
    - deletes are still allowed, for a delete;
    - for edits and post deletes, the post on BAND still has the text you saw;
