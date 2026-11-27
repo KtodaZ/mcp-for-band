@@ -65,7 +65,8 @@ export function serveStdio() {
       clearTimeout(timer);
       if (r?.error) return resolve("cancel");
       const res = r?.result;
-      resolve(res?.action === "accept" && res?.content?.approve === true ? "accept" : res?.action === "decline" ? "decline" : "cancel");
+      // Submitting the form with the box unticked is a no.
+      resolve(res?.action === "accept" ? (res?.content?.approve === true ? "accept" : "decline") : res?.action === "decline" ? "decline" : "cancel");
     });
     send({ jsonrpc: "2.0", id, method: "elicitation/create", params: { message, requestedSchema: { type: "object", properties: { approve: { type: "boolean", title: "Send this to BAND", description: "Approve exactly this write" } }, required: ["approve"] } } });
   });
@@ -78,6 +79,9 @@ export function serveStdio() {
     if (!isMessage(msg)) return send(fail(null, -32600, "Invalid request"));
     // Responses to our elicitation requests.
     if (msg.id != null && !msg.method && waiting.has(msg.id)) { const f = waiting.get(msg.id)!; waiting.delete(msg.id); return f(msg); }
+    // A late response to an elicitation that already timed out: nothing to answer.
+    if (!("method" in msg) && ("result" in msg || "error" in msg)) return;
+    if (typeof msg.method !== "string") return send(fail(msg.id, -32600, "Invalid request"));
     if (msg.method === "initialize") clientCanElicit = !!msg.params?.capabilities?.elicitation;
     void handle(msg, ctx()).then((r) => r && send(r));
   });
@@ -87,6 +91,7 @@ export function serveStdio() {
 // ── HTTP ──────────────────────────────────────────────────────────────────
 /** A JSON-RPC message: an object, not null, an array or a bare value. */
 const isMessage = (m: unknown): m is Rpc => !!m && typeof m === "object" && !Array.isArray(m);
+const isRequest = (m: unknown): m is Rpc => isMessage(m) && typeof (m as Rpc).method === "string";
 
 /**
  * This machine's Tailscale IPv4 addresses, only when BAND_MCP_TAILSCALE=1. Otherwise the HTTP
@@ -150,8 +155,8 @@ export function serveHttp(port = HTTP_PORT) {
         if (!canWrite && !same(bearer, secrets.readToken)) { res.writeHead(401).end("Unauthorized"); return; }
         let body: unknown;
         try { body = JSON.parse(await readBody(req)); } catch { res.writeHead(400, { "content-type": "application/json" }).end(JSON.stringify(fail(null, -32700, "Parse error"))); return; }
-        if (Array.isArray(body) && (body.length > 20 || !body.every(isMessage))) { res.writeHead(400, { "content-type": "application/json" }).end(JSON.stringify(fail(null, -32600, "Batches hold up to 20 requests"))); return; }
-        if (!Array.isArray(body) && !isMessage(body)) { res.writeHead(400, { "content-type": "application/json" }).end(JSON.stringify(fail(null, -32600, "Invalid request"))); return; }
+        if (Array.isArray(body) && (!body.length || body.length > 20 || !body.every(isRequest))) { res.writeHead(400, { "content-type": "application/json" }).end(JSON.stringify(fail(null, -32600, "A batch holds 1 to 20 requests"))); return; }
+        if (!Array.isArray(body) && !isRequest(body)) { res.writeHead(400, { "content-type": "application/json" }).end(JSON.stringify(fail(null, -32600, "Invalid request"))); return; }
         const ctx: ToolContext = { canWrite };
         const out = Array.isArray(body) ? (await Promise.all(body.map((m) => handle(m as Rpc, ctx)))).filter(Boolean) : await handle(body, ctx);
         if (!out || (Array.isArray(out) && !out.length)) { res.writeHead(202).end(); return; }

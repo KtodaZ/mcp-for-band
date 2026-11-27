@@ -197,6 +197,15 @@ describe("writes", () => {
     const ex = await import("../src/executors");
     expect(ex.withMentions("Thanks @Quokka & crew", [{ name: "Quokka", key: "42" }])).toBe('Thanks <band:refer user_no="42">Quokka</band:refer> &amp; crew');
     expect(ex.withMentions("Hi", [{ name: "Marmot", key: "7" }])).toBe('Hi <band:refer user_no="7">Marmot</band:refer>');
+    // A name that starts another name doesn't match inside it.
+    expect(ex.withMentions("Thanks @Alex and @Al", [{ name: "Al", key: "1" }, { name: "Alex", key: "2" }]))
+      .toBe('Thanks <band:refer user_no="2">Alex</band:refer> and <band:refer user_no="1">Al</band:refer>');
+    await expect(tools.callTool("search", { query: 123 }, { canWrite: true })).rejects.toThrow(/query must be string/);
+    await expect(tools.callTool("prepare_notice", { id: `post:${BAND}:5`, action: "pin" }, { canWrite: true })).rejects.toThrow(/one of add, remove/);
+    await expect(tools.callTool("get_item", {}, { canWrite: true })).rejects.toThrow(/id is required/);
+    await expect(tools.callTool("search", { from: "next week" }, { canWrite: true })).rejects.toThrow(/doesn't look right/);
+    const media = await import("../src/media");
+    for (const p of ["\\\\host\\share\\a.jpg", "\\/host\\share\\a.jpg", "/\\host/share/a.jpg"]) await expect(media.attachments([p])).rejects.toThrow(/network path/);
     expect(ex.parseTarget(`event_comment:${BAND}:4/111/9/20261121:5:2`)).toEqual({ kind: "event_comment", bandNo: BAND, scheduleId: "4/111/9/20261121", commentId: 5 });
     expect(ex.parseTarget(`post:${BAND}:12`)).toEqual({ kind: "post", bandNo: BAND, postNo: 12 });
   });

@@ -138,11 +138,15 @@ export function execute(id: string, currentVersion?: () => Promise<string | null
     const row = get(id);
     if (!row) throw new BandError("unsupported", `No write ${id}`);
     if (row.status !== "approved") throw new BandError("unsupported", `Write ${id} is ${row.status}; it needs the user's approval first`);
-    if (!row.approved_at || Date.parse(row.approved_at) < Date.now() - APPROVAL_TTL_MS) {
-      setStatus(id, "expired");
-      throw new BandError("unsupported", `The approval for ${id} is over 10 minutes old; prepare it again`);
-    }
-    if (DESTRUCTIVE.includes(row.action) && !destructiveAllowed()) throw new BandError("unsupported", "Deletes were turned off after this was approved");
+    // Retire a stale or no-longer-allowed approval for good, but only if it's still 'approved'
+    // (another process may have started it).
+    const retire = (status: "expired" | "failed", why: string) => {
+      const r = open().prepare("UPDATE writes SET status = ?, result = ?, updated_at = ? WHERE id = ? AND status = 'approved'").run(status, JSON.stringify({ error: why }), now(), id);
+      if (r.changes === 1) event(id, status, { result: why });
+      throw new BandError("unsupported", why);
+    };
+    if (!row.approved_at || Date.parse(row.approved_at) < Date.now() - APPROVAL_TTL_MS) retire("expired", `The approval for ${id} is over 10 minutes old; prepare it again`);
+    if (DESTRUCTIVE.includes(row.action) && !destructiveAllowed()) retire("failed", "Deletes were turned off after this was approved");
     const payload = JSON.parse(row.payload) as WritePayload;
     if (hashPayload(row.action, payload) !== row.payload_hash) throw new BandError("unsupported", "Payload changed after approval; prepare it again");
     const claim = open().prepare("UPDATE writes SET status = 'executing', updated_at = ? WHERE id = ? AND status = 'approved'").run(now(), id);
@@ -165,7 +169,8 @@ export function execute(id: string, currentVersion?: () => Promise<string | null
       setStatus(id, "done", { result: JSON.stringify(result ?? null) });
     } catch (e) {
       // A network failure mid-write may still have reached BAND: don't retry blindly.
-      const definite = e instanceof BandError && (e.kind === "auth" || e.kind === "unsupported" || e.kind === "shape");
+      // A TypeError and the like fails before any request, so it's definite too.
+      const definite = (e instanceof BandError && (e.kind === "auth" || e.kind === "unsupported" || e.kind === "shape")) || (e instanceof TypeError && !/fetch|network/i.test(e.message));
       setStatus(id, definite ? "failed" : "unknown", { result: JSON.stringify({ error: (e as Error).message }) });
     }
     return get(id)!;

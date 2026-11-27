@@ -206,7 +206,7 @@ export function upsertMembers(bandNo: number, members: { key: string; name: stri
 }
 
 export function findMembers(bandNo: number, name: string) {
-  return open().prepare("SELECT member_key, name, role FROM members WHERE band_no = ? AND name LIKE ? ORDER BY name LIMIT 20").all(bandNo, `%${name}%`) as { member_key: string; name: string; role: string | null }[];
+  return open().prepare("SELECT member_key, name, role FROM members WHERE band_no = ? AND name LIKE ? ESCAPE '!' ORDER BY name LIMIT 20").all(bandNo, `%${name.replace(/[!%_]/g, "!$&")}%`) as { member_key: string; name: string; role: string | null }[];
 }
 
 export function resetForTests() {

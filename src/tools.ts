@@ -36,6 +36,7 @@ function noMedia(a: { photos?: string[]; videos?: string[] }, what: string) {
 
 function resolveMentions(bandNo: number, names: string[] = []) {
   return names.map((n) => {
+    if (!n.replace(/^@/, "").trim()) throw new BandError("unsupported", "Tags must be member names");
     const hits = store.findMembers(bandNo, n.replace(/^@/, ""));
     const exact = hits.filter((h) => h.name.toLowerCase() === n.replace(/^@/, "").toLowerCase());
     const pick = exact.length === 1 ? exact[0] : hits.length === 1 ? hits[0] : undefined;
@@ -105,6 +106,7 @@ export const TOOLS: Tool[] = [
       const b = resolveBand(a.band);
       const from = a.from ?? daysAgo(14);
       const to = a.to ?? today();
+      day(from); day(to);
       const out: Record<string, unknown> = { band: bandName(b) };
       if (a.posts !== false) out.posts = await sync.syncPosts(b, day(from));
       if (a.events !== false) out.events = await sync.syncEvents(b, from, to);
@@ -170,10 +172,15 @@ export const TOOLS: Tool[] = [
         if (!/^https:\/\/[\w.-]+\.(band\.us|pstatic\.net|naver\.net|campmobile\.net)\//.test(u)) continue;
         const res = await ctx.request.get(u, { maxRedirects: 0, timeout: 60_000 });
         const type = res.headers()["content-type"] ?? "";
-        if (!res.ok() || !type.startsWith("image/") || Number(res.headers()["content-length"] ?? 0) > 50 * 1024 ** 2) continue;
+        // Playwright buffers the whole response, so also require a declared size and check the bytes.
+        const max = 50 * 1024 ** 2, declared = Number(res.headers()["content-length"]);
+        if (!res.ok() || !type.startsWith("image/") || !(declared > 0 && declared <= max)) { await res.dispose(); continue; }
+        const body = await res.body();
+        await res.dispose();
+        if (body.length > max) continue;
         const ext = type.includes("png") ? "png" : type.includes("gif") ? "gif" : type.includes("webp") ? "webp" : "jpg";
         const f = path.join(dir, `${i + 1}.${ext}`);
-        fs.writeFileSync(f, await res.body());
+        fs.writeFileSync(f, body);
         files.push(f);
       }
       return { files };
@@ -220,7 +227,10 @@ export const TOOLS: Tool[] = [
       }
       const m = await mediaFor(a);
       if (m) media.checkCommentMedia(m);
-      const p: writes.WritePayload = { bandNo: it.band_no, target: a.reply_to ?? a.id, text: a.text, mentions: resolveMentions(it.band_no, a.tags), media: m };
+      // BAND replies are one level deep: a reply to a reply lands under its top comment, so target
+      // (and preview) that comment.
+      const replyTo = typeof a.reply_to === "string" && a.reply_to ? a.reply_to.split(":").slice(0, 4).join(":") : undefined;
+      const p: writes.WritePayload = { bandNo: it.band_no, target: replyTo ?? a.id, text: a.text, mentions: resolveMentions(it.band_no, a.tags), media: m };
       return prepared(writes.prepare("comment", p, previewText("comment", it.band_no, p, [`On: ${it.title ?? store.stripMarkup(it.body).slice(0, 80)}`])), ctx);
     },
   },
@@ -262,7 +272,8 @@ export const TOOLS: Tool[] = [
       if (a.id.split(":").length > 4) throw new BandError("unsupported", "Deleting a reply isn't supported yet. Delete it in BAND");
       const action = it.kind === "post" ? "delete_post" : "delete_comment";
       const p: writes.WritePayload = { bandNo: it.band_no, target: a.id };
-      return prepared(writes.prepare(action, p, previewText(action, it.band_no, p, ["THIS PERMANENTLY DELETES IT FROM BAND.", `Text:\n${store.stripMarkup(it.body)}`]), null, it), ctx);
+      const version = action === "delete_post" ? crypto.createHash("sha256").update(it.body).digest("hex") : null;
+      return prepared(writes.prepare(action, p, previewText(action, it.band_no, p, ["THIS PERMANENTLY DELETES IT FROM BAND.", `Text:\n${store.stripMarkup(it.body)}`]), version, it), ctx);
     },
   },
   {
@@ -334,5 +345,24 @@ export async function callTool(name: string, args: Record<string, unknown>, ctx:
   const tool = allTools().find((t) => t.name === name);
   if (!tool) throw new BandError("unsupported", `Unknown tool ${name}`);
   if (tool.write && !ctx.canWrite) throw new BandError("auth", "This connection has read-only access");
-  return tool.run(args ?? {}, ctx);
+  const a = args ?? {};
+  if (typeof a !== "object" || Array.isArray(a)) throw new BandError("unsupported", "Arguments must be an object");
+  checkArgs(tool.inputSchema, a);
+  return tool.run(a, ctx);
+}
+
+/** Check arguments against the tool's own schema (types, items, enums, patterns, required), so tools get what they declare. */
+function checkArgs(schema: any, args: Record<string, unknown>) {
+  const is = (v: unknown, t: string) =>
+    t === "array" ? Array.isArray(v) : t === "integer" ? Number.isInteger(v) : t === "object" ? !!v && typeof v === "object" && !Array.isArray(v) : typeof v === t;
+  const check = (name: string, s: any, v: unknown) => {
+    if (!s) return;
+    const types: string[] | undefined = s.type ? [].concat(s.type) : undefined;
+    if (types && !types.some((t) => is(v, t))) throw new BandError("unsupported", `${name} must be ${types.join(" or ")}`);
+    if (s.enum && !s.enum.includes(v)) throw new BandError("unsupported", `${name} must be one of ${s.enum.join(", ")}`);
+    if (s.pattern && typeof v === "string" && !new RegExp(s.pattern, "u").test(v)) throw new BandError("unsupported", `${name} doesn't look right: ${JSON.stringify(v)}`);
+    if (Array.isArray(v)) v.forEach((x, i) => check(`${name}[${i}]`, s.items, x));
+  };
+  for (const r of schema?.required ?? []) if (args[r] === undefined || args[r] === null || args[r] === "") throw new BandError("unsupported", `${r} is required`);
+  for (const [k, v] of Object.entries(args)) if (v !== undefined && v !== null) check(k, schema?.properties?.[k], v);
 }

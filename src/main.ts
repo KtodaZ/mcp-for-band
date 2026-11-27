@@ -31,7 +31,12 @@ async function backgroundSync() {
 if (cmd === "serve" || cmd === "stdio") registerExecutors();
 
 if (cmd === "serve") {
-  const { hosts } = serveHttp();
+  const { hosts, servers } = serveHttp();
+  // If any address can't be bound (port taken), stop instead of running half a server.
+  await Promise.all(servers.map((s) => new Promise<void>((resolve) => {
+    s.once("listening", () => resolve());
+    s.once("error", () => { for (const o of servers) o.close(); process.exit(1); });
+  })));
   console.error(`[band-mcp] listening on ${hosts.join(", ")}`);
   if (!process.argv.includes("--no-sync")) {
     setTimeout(() => void backgroundSync(), 30_000);

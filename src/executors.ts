@@ -37,13 +37,20 @@ const escapeText = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;")
 
 /** Plain text with BAND mention markup for the approved tags: "@Name" in the text, else appended. */
 export function withMentions(text: string, mentions: WritePayload["mentions"] = []) {
-  let out = escapeText(text);
-  for (const m of mentions) {
-    if (!/^\d+$/.test(String(m.key))) throw new BandError("unsupported", `Bad member key for ${m.name}`);
-    const tag = `<band:refer user_no="${m.key}">${escapeText(m.name)}</band:refer>`;
-    const at = `@${escapeText(m.name)}`;
-    out = out.includes(at) ? out.replace(at, () => tag) : `${out} ${tag}`;
+  if (typeof text !== "string") throw new BandError("unsupported", "Text must be a string");
+  for (const m of mentions) if (!/^\d+$/.test(String(m.key))) throw new BandError("unsupported", `Bad member key for ${m.name}`);
+  const tag = (m: { key: string; name: string }) => `<band:refer user_no="${m.key}">${escapeText(m.name)}</band:refer>`;
+  // One pass over the original text, longest names first, so "@Al" never matches inside "@Alex"
+  // and no name is looked for inside a tag already made. Each name is tagged once.
+  const byLength = [...mentions].sort((a, b) => b.name.length - a.name.length);
+  const used = new Set<typeof mentions[number]>();
+  let out = "";
+  for (let i = 0; i < text.length;) {
+    const m = text[i] === "@" ? byLength.find((m) => !used.has(m) && text.startsWith(m.name, i + 1) && !/[\p{L}\p{N}_]/u.test(text[i + 1 + m.name.length] ?? "")) : undefined;
+    if (m) { used.add(m); out += tag(m); i += 1 + m.name.length; }
+    else { out += escapeText(text[i]!); i++; }
   }
+  for (const m of mentions) if (!used.has(m)) out += ` ${tag(m)}`;
   return out;
 }
 
@@ -88,7 +95,12 @@ export function registerExecutors() {
     if (Number(post.photo_count ?? 0) || Number(post.video_count ?? 0) || Object.values(att).some((v) => v && typeof v === "object" && Object.keys(v).length)) {
       throw new BandError("unsupported", "This post has attachments, which edits can't keep yet. Edit it in BAND");
     }
-    const isNotice = (await liveNotices(t.bandNo)).some((n) => n.id === p.target);
+    const notice = (await liveNotices(t.bandNo)).find((n) => n.id === p.target);
+    const isNotice = !!notice;
+    // update_post can only keep a plain notice; it would demote a major one or drop its end time.
+    if (notice?.major || (post.band_notice_unset_at && post.band_notice_unset_at !== "")) {
+      throw new BandError("unsupported", "This post is a major or timed notice, which edits can't keep yet. Edit it in BAND");
+    }
     const json = await call("v2.0.2/update_post", {
       band_no: t.bandNo, post_no: t.postNo, content: withMentions(p.text ?? "", p.mentions), set_linked_band_notice: "",
       copiable_state: post.copiable_state ?? "unassigned", should_disable_comment: post.should_disable_comment === true,
@@ -130,10 +142,17 @@ export function registerExecutors() {
   registerExecutor("add_notice", setNotice("notice"));
   registerExecutor("remove_notice", setNotice("off"));
 
-  registerExecutor("delete_post", async (_row, p) => {
+  registerExecutor("delete_post", async (row, p) => {
     const t = parseTarget(p.target!);
     if (t.kind !== "post") throw new BandError("unsupported", "Not a post");
     sameBand(t, p);
+    // Delete only the post the user saw: refuse if it changed on BAND since the preview.
+    if (row.target_version) {
+      const post = await livePost(t.bandNo, t.postNo);
+      if (crypto.createHash("sha256").update(String(post.content ?? "")).digest("hex") !== row.target_version) {
+        throw new BandError("unsupported", "The post changed on BAND since the preview; prepare the delete again");
+      }
+    }
     await call("v1.5.0/delete_post", { band_no: t.bandNo, post_no: t.postNo, version: "20140508" }, "GET");
     store.markDeleted(p.target!);
     return { deleted: p.target };

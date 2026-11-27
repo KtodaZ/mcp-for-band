@@ -31,10 +31,15 @@ export async function attachments(photos: string[] = [], videos: string[] = []):
     for (const raw of list) {
       // Check the name before touching the disk: only local photo or video files, never network
       // paths (on Windows, reading \host\share would contact that host).
-      if (/^(\\\\|\/\/)/.test(raw)) throw new BandError("unsupported", `${raw} is a network path; use a local file`);
       const p = path.resolve(raw);
+      if (/^[\\/]{2}/.test(raw) || /^[\\/]{2}/.test(p)) throw new BandError("unsupported", `${raw} is a network path; use a local file`);
       if (!re.test(p)) throw new BandError("unsupported", `${path.basename(p)} doesn't look like a ${kind}`);
-      const st = fs.statSync(p, { throwIfNoEntry: false });
+      if (!fs.lstatSync(p, { throwIfNoEntry: false })) throw new BandError("unsupported", `No such file: ${raw}`);
+      // A link or junction could still point at a network share.
+      let real: string;
+      try { real = fs.realpathSync.native(p); } catch { throw new BandError("unsupported", `No such file: ${raw}`); }
+      if (/^[\\/]{2}/.test(real)) throw new BandError("unsupported", `${raw} points to a network path; use a local file`);
+      const st = fs.statSync(real, { throwIfNoEntry: false });
       if (!st?.isFile()) throw new BandError("unsupported", `No such file: ${raw}`);
       out.push({ path: p, sha256: await sha256File(p), kind, bytes: st.size });
     }
