@@ -7,7 +7,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import type { Page } from "playwright-core";
-import { BandError } from "./band";
+import { BandError, SIGNED_OUT } from "./band";
 import { ownPage } from "./chrome";
 import { DATA_DIR } from "./config";
 
@@ -39,9 +39,16 @@ export async function attachments(photos: string[] = [], videos: string[] = []):
       let real: string;
       try { real = fs.realpathSync.native(p); } catch { throw new BandError("unsupported", `No such file: ${raw}`); }
       if (/^[\\/]{2}/.test(real)) throw new BandError("unsupported", `${raw} points to a network path; use a local file`);
+      // Check the file the link points to, so a link named photo.jpg can't send some other file,
+      // and never send anything from the server's own data folder (tokens, session, cache).
+      if (!re.test(real)) throw new BandError("unsupported", `${raw} points to ${path.basename(real)}, which doesn't look like a ${kind}`);
+      let data = path.resolve(DATA_DIR);
+      try { data = fs.realpathSync.native(DATA_DIR); } catch { /* not created yet */ }
+      if (real === data || real.startsWith(data + path.sep)) throw new BandError("unsupported", `${raw} is in the server's data folder`);
       const st = fs.statSync(real, { throwIfNoEntry: false });
       if (!st?.isFile()) throw new BandError("unsupported", `No such file: ${raw}`);
-      out.push({ path: p, sha256: await sha256File(p), kind, bytes: st.size });
+      // Keep the real path: the preview shows the file that will actually be sent.
+      out.push({ path: real, sha256: await sha256File(real), kind, bytes: st.size });
     }
   }
   return out;
@@ -66,6 +73,13 @@ export async function upload(pageUrl: string, items: Attachment[]): Promise<Uplo
     for (const [i, a] of items.entries()) {
       const title = path.basename(a.path);
       const copy = path.join(stage, `${i}${path.extname(a.path)}`);
+      // The path may have become a link to a network share since it was approved; don't touch it then.
+      // a.path was stored with links resolved, so a link there now means it changed. Check that
+      // before resolving, since resolving a link to a share already contacts it.
+      if (fs.lstatSync(a.path, { throwIfNoEntry: false })?.isSymbolicLink()) throw new BandError("unsupported", `${title} changed since it was approved; prepare the write again`);
+      let real: string;
+      try { real = fs.realpathSync.native(a.path); } catch { throw new BandError("unsupported", `Can't read ${title} any more; prepare the write again`); }
+      if (real !== a.path) throw new BandError("unsupported", `${title} changed since it was approved; prepare the write again`);
       const st = fs.statSync(a.path, { throwIfNoEntry: false });
       if (!st?.isFile() || st.size !== a.bytes) throw new BandError("unsupported", `${title} changed since it was approved; prepare the write again`);
       try { fs.copyFileSync(a.path, copy); } catch { throw new BandError("unsupported", `Can't read ${title} any more; prepare the write again`); }
@@ -85,7 +99,7 @@ export async function upload(pageUrl: string, items: Attachment[]): Promise<Uplo
 
 async function uploadOne(page: Page, pageUrl: string, a: Attachment, title: string): Promise<Uploaded> {
   await page.goto(pageUrl, { waitUntil: "domcontentloaded", timeout: 30_000 });
-  if (/auth\.band\.us|\/login\b/.test(page.url())) throw new BandError("auth", "BAND sign-in needed. Call the sign_in tool.");
+  if (SIGNED_OUT.test(page.url())) throw new BandError("auth", "BAND sign-in needed. Call the sign_in tool.");
   await page.waitForSelector("input._mediaUploadInput", { state: "attached", timeout: 20_000 })
     .catch(() => { throw new BandError("unsupported", "No comment box on that BAND page to upload through"); });
   // Allow about 200 KB/s, and at least two minutes.

@@ -7,6 +7,7 @@ import fs from "node:fs";
 import { serveHttp, serveStdio } from "./server";
 import { loadSecrets, saveSecrets, loadSettings, ensureDataDir } from "./config";
 import { syncPosts, syncEvents } from "./sync";
+import { BandError } from "./band";
 import { callTool } from "./tools";
 import { localDate } from "./helpers";
 import { context, disconnect, signIn } from "./chrome";
@@ -24,22 +25,28 @@ async function backgroundSync() {
       console.error(`[band-mcp] synced ${b}`);
     } catch (e) {
       console.error(`[band-mcp] background sync of ${b} stopped: ${(e as Error).message}`);
+      // Rate limited or signed out: the other bands would fail the same way, so wait for the next run.
+      if (e instanceof BandError && (e.kind === "rate_limited" || e.kind === "auth")) return;
     }
   }
 }
 
 /**
- * Background sync, off unless settings.json sets syncIntervalMinutes. Settings are read again
- * before each run, so turning it on, off or changing the interval needs no restart (it applies
- * within a minute when it was off).
+ * Background sync, off unless settings.json sets syncIntervalMinutes. A one-minute tick re-reads the
+ * settings, so turning it on or off or changing the interval applies within a minute, no restart.
+ * The first run is 30 seconds after start.
  */
-function scheduleSync(first = false) {
-  const minutes = loadSettings().syncIntervalMinutes;
-  const delay = minutes > 0 ? (first ? 30_000 : minutes * 60_000) : 60_000;
-  setTimeout(async () => {
-    if (loadSettings().syncIntervalMinutes > 0) await backgroundSync();
-    scheduleSync();
-  }, delay);
+function scheduleSync() {
+  let last = -Infinity;
+  const tick = async () => {
+    const minutes = loadSettings().syncIntervalMinutes;
+    if (minutes > 0 && Date.now() - last >= minutes * 60_000) {
+      last = Date.now();
+      await backgroundSync();
+    }
+    setTimeout(tick, 60_000);
+  };
+  setTimeout(tick, 30_000);
 }
 
 if (cmd === "serve" || cmd === "stdio") registerExecutors();
@@ -52,7 +59,7 @@ if (cmd === "serve") {
     s.once("error", () => { for (const o of servers) o.close(); process.exit(1); });
   })));
   console.error(`[band-mcp] listening on ${hosts.join(", ")}`);
-  if (!process.argv.includes("--no-sync")) scheduleSync(true);
+  if (!process.argv.includes("--no-sync")) scheduleSync();
 } else if (cmd === "stdio") {
   serveStdio();
 } else if (cmd === "signin") {

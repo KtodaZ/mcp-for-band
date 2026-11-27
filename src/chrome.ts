@@ -74,16 +74,27 @@ export async function ensureChrome(): Promise<Launch | null> {
 }
 
 let browser: Browser | null = null;
+let connecting: Promise<Browser> | null = null;
 
+/** The shared Chrome's context. Concurrent callers share one connection attempt. */
 export async function context(): Promise<BrowserContext> {
   if (!browser || !browser.isConnected()) {
-    const launch = await ensureChrome();
-    browser = await chromium.connectOverCDP(CDP);
-    await closeOrphanTabs(browser.contexts()[0]!).catch(() => undefined);
-    await applyWindowMode(browser.contexts()[0]!).catch(() => undefined);
-    if (launch) await restoreFront(launch);
+    connecting ??= (async () => {
+      try {
+        const launch = await ensureChrome();
+        const b = await chromium.connectOverCDP(CDP);
+        await closeOrphanTabs(b.contexts()[0]!).catch(() => undefined);
+        await applyWindowMode(b.contexts()[0]!).catch(() => undefined);
+        if (launch && windowMode() === "minimized") await restoreFront(launch);
+        browser = b;
+        return b;
+      } finally {
+        connecting = null;
+      }
+    })();
+    await connecting;
   }
-  return browser.contexts()[0]!;
+  return browser!.contexts()[0]!;
 }
 
 /**
@@ -102,7 +113,11 @@ export async function ownPage(ctx?: BrowserContext): Promise<Page> {
 
 /** A sign-in tab marks itself so other processes don't minimize the window while the user signs in. */
 const SIGNIN = /^bmcp-signin-(\d+)$/;
-const nameOf = (p: Page) => p.evaluate("window.name").catch(() => null) as Promise<string | null>;
+// A tab with a dialog open or a hung page never answers, so give up on it after a second.
+const nameOf = (p: Page) => Promise.race([
+  p.evaluate("window.name").catch(() => null) as Promise<string | null>,
+  new Promise<null>((r) => setTimeout(() => r(null), 1000)),
+]);
 
 /** Minimize the window unless a live process is waiting for the user to sign in. */
 async function minimize(page: Page) {
@@ -152,9 +167,18 @@ async function closeOrphanTabs(ctx: BrowserContext) {
     const pid = /^bmcp-(?:signin-)?(\d+)$/.exec((await nameOf(p)) ?? "")?.[1];
     if (pid && !alive(Number(pid))) doomed.push(p);
   }
-  // Keep one tab, or Chrome closes the window and quits.
-  if (doomed.length && doomed.length === pages.length) await newTab(ctx);
-  for (const p of doomed) await p.close().catch(() => undefined);
+  for (const p of doomed) await closeKeepingOne(p);
+}
+
+/** Close a tab, but never Chrome's last one, or Chrome quits under the other processes. Checks the live tab list, since other processes open and close tabs too. */
+async function closeKeepingOne(p: Page) {
+  if (p.isClosed()) return;
+  if (p.context().pages().length <= 1) {
+    await p.goto("about:blank").catch(() => undefined);
+    await p.evaluate(`window.name = ""`).catch(() => undefined);
+    return;
+  }
+  await p.close().catch(() => undefined);
 }
 
 /** "minimized" (default) or "visible", from BAND_MCP_WINDOW or settings.json `window`. */
@@ -168,8 +192,9 @@ async function setWindow(page: Page, bounds: Bounds) {
   const cdp = await page.context().newCDPSession(page);
   try {
     const { windowId, bounds: now } = (await cdp.send("Browser.getWindowForTarget")) as { windowId: number; bounds: Bounds };
-    // Older versions parked the window off-screen; bring it back first so it restores on-screen.
-    const offScreen = (now.left ?? 0) < -1000;
+    // Older versions parked the window off-screen at x = -2400; bring it back first so it restores
+    // on-screen. Match that spot only, since a monitor left of the main one also has negative x.
+    const offScreen = Math.abs((now.left ?? 0) + 2400) < 8;
     if (offScreen || bounds.windowState === "normal") {
       await cdp.send("Browser.setWindowBounds", { windowId, bounds: { windowState: "normal" } });
       if (offScreen) await cdp.send("Browser.setWindowBounds", { windowId, bounds: { left: 200, top: 80, width: 1100, height: 850 } });
@@ -193,15 +218,16 @@ async function applyWindowMode(ctx: BrowserContext) {
 
 /** This process's own BAND tab, kept open between calls. */
 let tab: Page | null = null;
+let opening: Promise<Page> | null = null;
 export async function bandTab(): Promise<Page> {
   if (tab && !tab.isClosed()) return tab;
-  const ctx = await context();
-  tab = await ownPage(ctx);
-  return tab;
+  // Concurrent callers share one new tab instead of each opening one.
+  opening ??= ownPage().then((p) => (tab = p)).finally(() => { opening = null; });
+  return opening;
 }
 
 export async function disconnect() {
-  try { if (tab && !tab.isClosed()) await tab.close(); } catch { /* gone */ }
+  if (tab) await closeKeepingOne(tab);
   tab = null;
   // Disconnects from a CDP-attached browser; Chrome keeps running for other clients.
   try { await browser?.close(); } catch { /* gone */ }
@@ -236,6 +262,6 @@ export async function signIn(timeoutMs = 10 * 60_000): Promise<boolean> {
     throw e;
   } finally {
     if (windowMode() === "minimized") await setWindow(page, { windowState: "minimized" }).catch(() => undefined);
-    await page.close().catch(() => undefined);
+    await closeKeepingOne(page);
   }
 }

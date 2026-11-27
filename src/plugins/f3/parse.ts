@@ -1,7 +1,6 @@
-// This module parses workout event comments into unverified suggestions. It parses attendance
-// for data compatibility outside the editor, and volunteers confirm only milestone suggestions
-// in the review UI. A sampled backblast uses "Total Pax:3" followed by one attendee per line,
-// sometimes wrapped in BAND's <band:refer> markup. Keep the source text alongside suggestions.
+// This module parses backblasts into attendance and milestone suggestions. They're guesses from
+// free text, so keep the source text alongside them. A typical backblast has "Total Pax:3"
+// followed by one attendee per line, sometimes wrapped in BAND's <band:refer> mention markup.
 
 export type { SourceComment } from "./types";
 import type { AttendanceCandidate, MilestoneKind, MilestoneSuggestion, SourceComment } from "./types";

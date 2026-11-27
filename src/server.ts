@@ -116,7 +116,7 @@ function tailnetIps() {
 function allowedHost(host: string | undefined) {
   if (!host) return false;
   const h = host.replace(/:\d+$/, "").toLowerCase();
-  const name = os.hostname().toLowerCase();
+  const name = os.hostname().toLowerCase().replace(/\.local$/, ""); // macOS adds .local
   // The machine name, its MagicDNS name (<name>.<tailnet>.ts.net) or a Tailscale address; not any
   // <name>.<anything>, which a DNS rebinding page could use.
   const magic = h.startsWith(`${name}.`) && /^[a-z0-9-]+\.ts\.net$/.test(h.slice(name.length + 1));

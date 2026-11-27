@@ -4,6 +4,7 @@
 // band.ts without page loads or scrolling. See docs/band-web-api.md for endpoints.
 
 import { call, bandUrl, BandError } from "./band";
+import { localDate } from "./helpers";
 import * as store from "./store";
 import type { Item } from "./store";
 
@@ -143,7 +144,8 @@ export async function syncPosts(bandNo: number, since: string, opts: { comments?
   let incomplete = 0;
   if (opts.comments !== false) {
     for (const p of inRange) {
-      if (!Number((p.raw as J)?.comment_count ?? 0)) continue;
+      // No comments now: any cached ones were deleted.
+      if (!Number((p.raw as J)?.comment_count ?? 0)) { store.markMissingDeleted(bandNo, "post_comment", p.id, []); continue; }
       const got = await syncComments(bandNo, p, { content_type: "post", post_no: Number(p.id.split(":")[2]) }, "post_comment");
       commentsRead += got.count;
       if (!got.complete) incomplete++;
@@ -180,7 +182,7 @@ async function readComments(bandNo: number, contentKey: J) {
     total ??= typeof d.total === "number" ? d.total : null;
     params = d.paging?.previous_params ?? null; // older comments
   }
-  return { items, total };
+  return { items, total, done: params === null };
 }
 
 /** All comments and replies on a post or event. `complete` compares with BAND's own total. */
@@ -195,8 +197,9 @@ export async function syncComments(bandNo: number, parent: Item, contentKey: J, 
     rows.push(...commentRows(replies.items, parent, kind, topRows[i]!.id));
   }
   store.upsertItems(rows);
-  store.markMissingDeleted(bandNo, kind, parent.id, topRows.map((r) => r.id));
-  return { count: rows.length, complete: top.total === null || rows.length >= top.total };
+  // Only a full read shows that a missing comment was deleted; one cut off at the page limit doesn't.
+  if (top.done) store.markMissingDeleted(bandNo, kind, parent.id, topRows.map((r) => r.id));
+  return { count: rows.length, complete: top.done && (top.total === null || rows.length >= top.total) };
 }
 
 /** Events between two dates (YYYY-MM-DD), with all comments of events that have any. */
@@ -208,13 +211,14 @@ export async function syncEvents(bandNo: number, from: string, to: string, opts:
     for (const e of extractEvents(json, bandNo)) events.set(e.id, e);
     params = json.result_data?.paging?.next_params ?? null;
   }
-  const inRange = [...events.values()].filter((e) => e.createdAt.slice(0, 10) >= from && e.createdAt.slice(0, 10) <= to && e.bandNo === bandNo);
+  // Compare local dates: an evening event's UTC date is often the next day.
+  const inRange = [...events.values()].filter((e) => { const d = localDate(e.createdAt); return d >= from && d <= to && e.bandNo === bandNo; });
   store.upsertItems(inRange);
   let comments = 0;
   let incomplete = 0;
   if (opts.comments !== false) {
     for (const e of inRange) {
-      if (!Number((e.raw as J)?.comment_count ?? 0)) continue;
+      if (!Number((e.raw as J)?.comment_count ?? 0)) { store.markMissingDeleted(bandNo, "event_comment", e.id, []); continue; }
       const got = await syncComments(bandNo, e, { content_type: "schedule", schedule_id: (e.raw as J).schedule_id }, "event_comment");
       comments += got.count;
       if (!got.complete) incomplete++;

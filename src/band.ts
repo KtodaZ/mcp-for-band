@@ -25,6 +25,16 @@ const ENDPOINTS_PATH = path.join(DATA_DIR, "endpoints.json");
 export type Captured = { url: string; method: string; status: number; json: any };
 
 let lastRenewal = 0;
+export const SIGNED_OUT = /auth\.band\.us\/(?!refresh)|\/login\b|^https:\/\/www\.band\.us\/about\//;
+
+// Everything that uses this process's BAND tab runs one at a time: a reload for sign-in status in the
+// middle of a write would cut the write off and leave it unknown.
+let queue: Promise<unknown> = Promise.resolve();
+function serial<T>(fn: () => Promise<T>): Promise<T> {
+  const run = queue.then(fn);
+  queue = run.catch(() => undefined);
+  return run;
+}
 
 /** Make sure the tab is on band.us and signed in. BAND renews its 5-minute session cookie by itself on page load. */
 export async function ensureSession(page?: Page): Promise<Page> {
@@ -36,20 +46,23 @@ export async function ensureSession(page?: Page): Promise<Page> {
     await p.waitForLoadState("networkidle", { timeout: 15_000 }).catch(() => undefined);
     lastRenewal = Date.now();
   }
-  if (/auth\.band\.us\/(?!refresh)|\/login\b/.test(p.url())) {
+  // Signed out, BAND sends www.band.us/ to its sign-in pages or to the /about/intro landing page.
+  if (SIGNED_OUT.test(p.url())) {
     throw new BandError("auth", "BAND sign-in needed. Call the sign_in tool, which opens BAND's sign-in window for the user.");
   }
   return p;
 }
 
-export async function signedIn(): Promise<{ signedIn: boolean; url: string }> {
-  try {
-    const p = await ensureSession();
-    return { signedIn: true, url: p.url() };
-  } catch (e) {
-    if (e instanceof BandError && e.kind === "auth") return { signedIn: false, url: (await bandTab()).url() };
-    throw e;
-  }
+export function signedIn(): Promise<{ signedIn: boolean; url: string }> {
+  return serial(async () => {
+    try {
+      const p = await ensureSession();
+      return { signedIn: true, url: p.url() };
+    } catch (e) {
+      if (e instanceof BandError && e.kind === "auth") return { signedIn: false, url: (await bandTab()).url() };
+      throw e;
+    }
+  });
 }
 
 function recordEndpoints(caps: Captured[]) {
@@ -72,7 +85,11 @@ function recordEndpoints(caps: Captured[]) {
  * Load a BAND page and collect JSON responses from BAND's API whose URL matches `match`.
  * `then` can interact with the page (scroll, click "previous comments") while capture runs.
  */
-export async function capture(url: string, match: RegExp, opts: { settleMs?: number; then?: (page: Page, caps: Captured[]) => Promise<void> } = {}): Promise<Captured[]> {
+export function capture(url: string, match: RegExp, opts: { settleMs?: number; then?: (page: Page, caps: Captured[]) => Promise<void> } = {}): Promise<Captured[]> {
+  return serial(() => captureNow(url, match, opts));
+}
+
+async function captureNow(url: string, match: RegExp, opts: { settleMs?: number; then?: (page: Page, caps: Captured[]) => Promise<void> }): Promise<Captured[]> {
   const page = await ensureSession();
   const caps: Captured[] = [];
   const pending: Promise<void>[] = [];
@@ -101,7 +118,7 @@ export async function capture(url: string, match: RegExp, opts: { settleMs?: num
   } finally {
     page.off("response", onResponse);
   }
-  if (/auth\.band\.us|\/login\b/.test(page.url())) throw new BandError("auth", "BAND sign-in needed. Call the sign_in tool.");
+  if (SIGNED_OUT.test(page.url())) throw new BandError("auth", "BAND sign-in needed. Call the sign_in tool.");
   for (const c of caps) checkResult(c);
   return caps;
 }
@@ -163,27 +180,29 @@ async function clientPage(): Promise<Page> {
  * `endpoint` is a path such as "v2.0.0/get_posts_and_announcements".
  */
 // Requests from this process go one at a time, at most about 3 per second, to stay well clear of BAND's limits.
-let queue: Promise<unknown> = Promise.resolve();
 let lastCall = 0;
 const MIN_GAP_MS = 300;
+const CALL_TIMEOUT_MS = 60_000;
 
 export function call(endpoint: string, data: Record<string, unknown> = {}, method: "GET" | "POST" = "GET"): Promise<any> {
-  const run = queue.then(async () => {
+  return serial(async () => {
     const wait = lastCall + MIN_GAP_MS - Date.now();
     if (wait > 0) await new Promise((r) => setTimeout(r, wait));
     try { return await callNow(endpoint, data, method); } finally { lastCall = Date.now(); }
   });
-  queue = run.catch(() => undefined);
-  return run;
 }
 
 async function callNow(endpoint: string, data: Record<string, unknown>, method: "GET" | "POST"): Promise<any> {
   const page = await clientPage();
   const url = `https://api.band.us/${endpoint.replace(/^\//, "")}`;
+  // A send that never answers (dropped connection, sleep) would hold up every later call. It throws a
+  // plain Error, not a BandError, so a write that timed out is marked unknown, never retried.
   const out = await page.evaluate(`new Promise((resolve) => {
+    setTimeout(() => resolve({ timedOut: true }), ${CALL_TIMEOUT_MS});
     window.__bmcpClient.send({ url: ${JSON.stringify(url)}, data: ${JSON.stringify(data)}, method: ${JSON.stringify(method)} })
       .then((json) => resolve({ ok: true, status: 200, json }), (json, _t, xhr) => resolve({ ok: false, status: (xhr && xhr.status) || 0, json: json && typeof json === "object" ? json : null }));
-  })`) as { ok: boolean; status: number; json: any };
+  })`) as { ok: boolean; status: number; json: any; timedOut?: boolean };
+  if (out.timedOut) throw new Error(`BAND ${endpoint} didn't answer within ${CALL_TIMEOUT_MS / 1000} seconds`);
   const cap = { url: `${url}?${new URLSearchParams(Object.keys(data).map((k) => [k, ""]))}`, method, status: out.status, json: out.json };
   checkResult(cap);
   if (!out.ok || out.json?.result_code !== 1) {

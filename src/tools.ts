@@ -202,7 +202,7 @@ export const TOOLS: Tool[] = [
   {
     name: "prepare_edit_post",
     write: true,
-    description: "Draft an edit to an existing post (e.g. the weekly announcement). Preview shows old and new text. Refused at confirm time if the post changed since.",
+    description: `Draft an edit to an existing post (e.g. the weekly announcement). Preview shows old and new text. Refused at confirm time if the post changed since. The preview quotes BAND member text. ${UNTRUSTED}`,
     inputSchema: { type: "object", properties: { id: { type: "string", description: "Cached post id" }, text: { type: "string" }, tags: { type: "array", items: { type: "string" } } }, required: ["id", "text"] },
     run: async (a, ctx) => {
       noMedia(a, "Edits");
@@ -216,7 +216,7 @@ export const TOOLS: Tool[] = [
   {
     name: "prepare_comment",
     write: true,
-    description: "Draft a comment (or a reply, with reply_to) on a post or event, optionally tagging members and attaching photos or one video (BAND comments can't mix them).",
+    description: `Draft a comment (or a reply, with reply_to) on a post or event, optionally tagging members and attaching photos or one video (BAND comments can't mix them). The preview quotes BAND member text. ${UNTRUSTED}`,
     inputSchema: { type: "object", properties: { id: { type: "string", description: "Cached post or event id" }, reply_to: { type: "string", description: "Comment id to reply to" }, text: { type: "string" }, tags: { type: "array", items: { type: "string" } }, ...mediaArgs }, required: ["id", "text"] },
     run: async (a, ctx) => {
       const it = store.getItem(a.id);
@@ -246,7 +246,7 @@ export const TOOLS: Tool[] = [
   {
     name: "prepare_notice",
     write: true,
-    description: "Draft adding a post to the band's notices or removing it from them. Removing only unpins; the post stays.",
+    description: `Draft adding a post to the band's notices or removing it from them. Removing only unpins; the post stays. The preview quotes BAND member text. ${UNTRUSTED}`,
     inputSchema: { type: "object", properties: { id: { type: "string", description: "Cached post id" }, action: { enum: ["add", "remove"] } }, required: ["id", "action"] },
     run: async (a, ctx) => {
       const it = store.getItem(a.id);
@@ -263,7 +263,7 @@ export const TOOLS: Tool[] = [
   {
     name: "prepare_delete",
     write: true,
-    description: "Draft deleting a post or comment. DESTRUCTIVE and off unless the user enabled it. The item is saved to the journal first; a repost can't restore its comments or reactions.",
+    description: `Draft deleting a post or comment. DESTRUCTIVE and off unless the user enabled it. The item is saved to the journal first; a repost can't restore its comments or reactions. The preview quotes BAND member text. ${UNTRUSTED}`,
     inputSchema: { type: "object", properties: { id: { type: "string" } }, required: ["id"] },
     run: async (a, ctx) => {
       const it = store.getItem(a.id);
