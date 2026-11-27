@@ -2,7 +2,7 @@
   "manifest_version": "0.3",
   "name": "mcp-for-band",
   "display_name": "BAND (unofficial)",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Search your BAND groups and post as yourself, with your approval for every write.",
   "long_description": "Unofficial and not affiliated with BAND or NAVER. Runs on your computer with its own Chrome window: you sign in to BAND once, then Claude can sync and search your bands, and draft posts and comments that only go out after you approve them. Automated use may go against BAND's terms of service; read them first.",
   "author": {
