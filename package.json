@@ -23,7 +23,8 @@
     "start": "tsx src/main.ts serve",
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run",
-    "pack:mcpb": "node scripts/pack-mcpb.mjs"
+    "pack:mcpb": "node scripts/pack-mcpb.mjs",
+    "release": "node scripts/release.mjs"
   },
   "dependencies": {
     "playwright-core": "1.63.0",

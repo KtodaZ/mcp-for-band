@@ -42,6 +42,7 @@ Other commands:
 | `npm test` | Unit tests |
 | `npm run typecheck` | TypeScript check |
 | `npm run pack:mcpb` | Builds `dist/mcp-for-band.mcpb`, the Claude Desktop extension |
+| `npm run release -- <x.y.z> <notes.md>` | Bumps the version, waits for CI, then tags and publishes a GitHub release with the `.mcpb` |
 
 To keep a source checkout's data apart from an installed copy, set `BAND_MCP_DIR` to another folder.
 
