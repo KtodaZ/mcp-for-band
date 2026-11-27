@@ -10,12 +10,16 @@ If `AGENTS.local.md` exists, read it too. It holds one person's machine-specific
 - If you change `manifest.json`, `package.json` or the entry point, also run `npm run pack:mcpb`.
 - `manifest.json` and `package.json` versions must match.
 
+## When the maintainer asks
+
+A request is the approval. If the maintainer asks for something (a release, a push, a BAND post or edit with text they gave or already approved), do it and report what was done. Don't come back to ask again. Ask only about something new they haven't seen.
+
 ## Releases
 
 A release is a GitHub release with the `.mcpb` attached. The project isn't on npm (`"private": true`).
 
 - **When:** after a fix or feature that users of the `.mcpb` would notice lands on `main`, say so and offer a release. Bump the patch version for fixes and the minor version for new tools or settings. Docs-only changes don't need one.
-- **Ask once:** show the maintainer the version and the draft notes in one message, and wait for a yes.
+- **Ask once:** if the maintainer asked for the release, that's the yes: run it and report. Otherwise offer it with the version and draft notes in one message.
 - **Notes:** a few short lines on what changed for users, plainly worded. No commit hashes or internals. End with the unofficial-use warning from the last release.
 - **Run it:** write the notes to a temporary file outside the repo, then `npm run release -- <x.y.z> <notes file>`. It checks the tree, bumps `package.json` and `manifest.json`, runs typecheck, tests and `pack:mcpb`, pushes, waits for CI on all three systems, and only then tags and publishes. If it stops, report where; nothing is tagged before CI passes.
 
