@@ -20,7 +20,7 @@ A release is a GitHub release with the `.mcpb` attached. The project isn't on np
 
 - **When:** after a fix or feature that users of the `.mcpb` would notice lands on `main`, say so and offer a release. Bump the patch version for fixes and the minor version for new tools or settings. Docs-only changes don't need one.
 - **Ask once:** if the maintainer asked for the release, that's the yes: run it and report. Otherwise offer it with the version and draft notes in one message.
-- **Notes:** a few short lines on what changed for users, plainly worded. No commit hashes or internals. End with the unofficial-use warning from the last release.
+- **Notes:** a few short lines on what changed for users, plainly worded. No commit hashes or internals, and no disclaimer: that lives in the README's Disclaimer section, as in similar unofficial-API projects.
 - **Run it:** write the notes to a temporary file outside the repo, then `npm run release -- <x.y.z> <notes file>`. It checks the tree, bumps `package.json` and `manifest.json`, runs typecheck, tests and `pack:mcpb`, pushes, waits for CI on all three systems, and only then tags and publishes. If it stops, report where; nothing is tagged before CI passes.
 
 ## Don't break these

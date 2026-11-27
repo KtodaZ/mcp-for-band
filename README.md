@@ -2,8 +2,6 @@
 
 mcp-for-band is an unofficial [MCP](https://modelcontextprotocol.io) server for [BAND](https://band.us). Claude or any MCP client uses your signed-in Chrome on your computer to search your bands and post as you.
 
-> **Unofficial, use at your own risk.** BAND and NAVER do not endorse or support this project. The server calls BAND's undocumented web API through BAND's web page, which may break at any time. Automated use may violate [BAND's terms of service](https://band.us/policy/terms), and BAND can restrict or close accounts for it. Read the terms first. Run it for your own account only, never as a service for others.
-
 ## What it does
 
 - **Local cache reads.** The server syncs posts, comments, events, event comments, and members into SQLite and searches across bands with `sync`, `search`, `list_posts`, `get_item`, `get_notices`, `find_member`, and `get_media`.
@@ -104,6 +102,10 @@ See [CONTRIBUTING.md](CONTRIBUTING.md). Coding agents also read [AGENTS.md](AGEN
 ## Don't like it? Fork it
 
 Issues and pull requests are welcome, with no promises on response time or features. If you want it to work differently, fork it and make it yours.
+
+## Disclaimer
+
+mcp-for-band is an independent project, not affiliated with, endorsed by or supported by BAND or NAVER. It calls BAND's undocumented web API, which can change or break at any time. Automated use may go against [BAND's terms of service](https://band.us/policy/terms), and BAND can restrict accounts for it, so read the terms and use it for your own account only. Use at your own risk.
 
 ## License
 
