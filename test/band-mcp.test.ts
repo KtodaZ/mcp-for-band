@@ -245,3 +245,14 @@ describe("writes", () => {
   });
 
 });
+
+describe("secrets", () => {
+  it("replaces a secrets file without real tokens, so no request gets in without one", async () => {
+    const config = await import("../src/config");
+    fs.writeFileSync(path.join(dir, "secrets.json"), "{}");
+    const s = config.loadSecrets();
+    expect(s.readToken).toMatch(/^[\w-]{32,}$/);
+    expect(s.writeToken).toMatch(/^[\w-]{32,}$/);
+    expect(s.readToken).not.toBe(s.writeToken);
+  });
+});

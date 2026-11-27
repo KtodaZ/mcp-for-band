@@ -73,8 +73,9 @@ export function prepare(action: WriteAction, payload: WritePayload, preview: str
 export function get(id: string): WriteRow | undefined {
   const row = open().prepare("SELECT * FROM writes WHERE id = ?").get(id) as WriteRow | undefined;
   if (row && row.status === "pending" && row.expires_at < now()) {
-    setStatus(id, "expired");
-    return { ...row, status: "expired" };
+    // Only a still-pending row expires, so this can't overwrite an approval made meanwhile.
+    open().prepare("UPDATE writes SET status = 'expired', updated_at = ? WHERE id = ? AND status = 'pending' AND expires_at < ?").run(now(), id, now());
+    return open().prepare("SELECT * FROM writes WHERE id = ?").get(id) as WriteRow | undefined;
   }
   return row;
 }

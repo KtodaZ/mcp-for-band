@@ -22,6 +22,12 @@ export const CHROME_PATHS = [
   "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
   "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
   "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+  "/usr/bin/google-chrome",
+  "/usr/bin/google-chrome-stable",
+  "/opt/google/chrome/chrome",
+  "/usr/bin/chromium",
+  "/usr/bin/chromium-browser",
+  "/snap/bin/chromium",
 ].filter((p): p is string => !!p);
 
 export interface Settings {
@@ -76,7 +82,10 @@ export interface Secrets {
 export function loadSecrets(): Secrets {
   ensureDataDir();
   try {
-    return JSON.parse(fs.readFileSync(SECRETS_PATH, "utf8")) as Secrets;
+    const s = JSON.parse(fs.readFileSync(SECRETS_PATH, "utf8"));
+    const ok = (t: unknown) => typeof t === "string" && t.length >= 32;
+    if (ok(s?.readToken) && ok(s?.writeToken) && s.readToken !== s.writeToken) return { readToken: s.readToken, writeToken: s.writeToken };
+    throw new Error("bad secrets");
   } catch {
     const s: Secrets = { readToken: token(), writeToken: token() };
     saveSecrets(s);

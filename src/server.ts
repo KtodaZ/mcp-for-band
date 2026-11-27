@@ -2,6 +2,7 @@
 // Claude Code approvals. HTTP uses bearer tokens on this host or Tailscale; there the user
 // approves a write by saying yes in chat.
 import http from "node:http";
+import crypto from "node:crypto";
 import os from "node:os";
 
 import readline from "node:readline";
@@ -114,8 +115,9 @@ export function serveHttp(port = HTTP_PORT) {
       if (url.pathname === "/mcp") {
         if (req.method !== "POST") { res.writeHead(405).end(); return; }
         const bearer = /^Bearer\s+(.+)$/i.exec(req.headers.authorization ?? "")?.[1];
-        const canWrite = bearer === secrets.writeToken;
-        if (!canWrite && bearer !== secrets.readToken) { res.writeHead(401).end("Unauthorized"); return; }
+        const same = (a: string | undefined, b: string) => !!a && a.length === b.length && crypto.timingSafeEqual(Buffer.from(a), Buffer.from(b));
+        const canWrite = same(bearer, secrets.writeToken);
+        if (!canWrite && !same(bearer, secrets.readToken)) { res.writeHead(401).end("Unauthorized"); return; }
         const body = JSON.parse(await readBody(req));
         const ctx: ToolContext = { canWrite };
         const out = Array.isArray(body) ? (await Promise.all(body.map((m) => handle(m, ctx)))).filter(Boolean) : await handle(body, ctx);
