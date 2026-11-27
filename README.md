@@ -44,11 +44,7 @@ Ask things like "sync my bands for the last two weeks", "who Q'd in November?", 
 
 ### From source
 
-```sh
-git clone https://github.com/KtodaZ/mcp-for-band && cd mcp-for-band
-npm install
-claude mcp add band -- node "$PWD/bin/band-mcp.mjs" stdio
-```
+See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ### Optional HTTP mode
 
@@ -77,13 +73,7 @@ Other environment variables set paths and defaults: `BAND_MCP_CHROME` sets Chrom
 
 ## Development
 
-```sh
-npm test
-npm run typecheck
-npm run pack:mcpb   # builds dist/mcp-for-band.mcpb for Claude Desktop
-```
-
-`scripts/` has helpers for mapping endpoints. Test writes only on a private band where only you are a member: `BAND_MCP_TEST_BAND=<band_no> npx tsx scripts/try-write.ts post '{...}'`.
+See [CONTRIBUTING.md](CONTRIBUTING.md). Coding agents also read [AGENTS.md](AGENTS.md).
 
 ## Don't like it? Fork it
 
